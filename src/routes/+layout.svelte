@@ -1,5 +1,5 @@
 <script lang="ts">
-	import "../app.css"
+	import "../app.css";
 	import favicon from "#lib/assets/favicon.svg";
 	import { onMount } from "svelte";
 	import type { LayoutProps } from "./$types";
@@ -12,11 +12,11 @@
 	onMount(() => {
 		const { data } = supabase.auth.onAuthStateChange((event, _session) => {
 			if (_session?.expires_at !== authClaims?.exp) {
-				invalidate('supabase:auth')
+				invalidate("supabase:auth");
 			}
-		})
-		return () => data.subscription.unsubscribe()
-	})
+		});
+		return () => data.subscription.unsubscribe();
+	});
 </script>
 
 <svelte:head>

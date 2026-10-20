@@ -8,26 +8,26 @@ MODERN CSS RESETS
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 /* 2. Remove default margin */
 *:not(dialog) {
-  margin: 0;
+	margin: 0;
 }
 
 /* 3. Enable keyword animations */
 @media (prefers-reduced-motion: no-preference) {
-  html {
-    interpolate-size: allow-keywords;
-  }
+	html {
+		interpolate-size: allow-keywords;
+	}
 }
 
 body {
-  /* 4. Increase line-height */
-  line-height: 1.5;
-  /* 5. Improve text rendering */
-  -webkit-font-smoothing: antialiased;
+	/* 4. Increase line-height */
+	line-height: 1.5;
+	/* 5. Improve text rendering */
+	-webkit-font-smoothing: antialiased;
 }
 
 /* 6. Improve media defaults */
@@ -36,8 +36,8 @@ picture,
 video,
 canvas,
 svg {
-  display: block;
-  max-width: 100%;
+	display: block;
+	max-width: 100%;
 }
 
 /* 7. Inherit fonts for form controls */
@@ -45,7 +45,7 @@ input,
 button,
 textarea,
 select {
-  font: inherit;
+	font: inherit;
 }
 
 /* 8. Avoid text overflows */
@@ -56,12 +56,12 @@ h3,
 h4,
 h5,
 h6 {
-  overflow-wrap: break-word;
+	overflow-wrap: break-word;
 }
 
 /* 9. Improve line wrapping */
 p {
-  text-wrap: pretty;
+	text-wrap: pretty;
 }
 h1,
 h2,
@@ -69,7 +69,7 @@ h3,
 h4,
 h5,
 h6 {
-  text-wrap: balance;
+	text-wrap: balance;
 }
 
 /*
@@ -77,7 +77,7 @@ h6 {
 */
 #root,
 #__next {
-  isolation: isolate;
+	isolation: isolate;
 }
 
 /* 
@@ -87,78 +87,78 @@ CUSTOM APP STYLES
 */
 
 header {
-  padding: 1.5rem;
+	padding: 1.5rem;
 }
 h2 {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 500;
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 500;
 }
 header p {
-  margin: 0.375rem 0 0;
-  color: #71717a;
-  font-size: 0.875rem;
+	margin: 0.375rem 0 0;
+	color: #71717a;
+	font-size: 0.875rem;
 }
 
 form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
 }
 label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.875rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	font-size: 0.875rem;
 }
 small {
-  color: #71717a;
-  font-size: 0.75rem;
+	color: #71717a;
+	font-size: 0.75rem;
 }
 
 input,
 button {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 2.75rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid #d4d4d8;
-  border-radius: 0.375rem;
-  font: inherit;
-  font-size: 0.875rem;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 2.75rem;
+	padding: 0.625rem 0.875rem;
+	border: 1px solid #d4d4d8;
+	border-radius: 0.375rem;
+	font: inherit;
+	font-size: 0.875rem;
 }
 
 input {
-  background: #fff;
-  color: #18181b;
+	background: #fff;
+	color: #18181b;
 }
 
 button {
-  background: #18181b;
-  color: #fff;
-  font-weight: 500;
-  cursor: pointer;
+	background: #18181b;
+	color: #fff;
+	font-weight: 500;
+	cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  background: #3f3f46;
+	background: #3f3f46;
 }
 button.secondary {
-  background: #fff;
-  color: #18181b;
+	background: #fff;
+	color: #18181b;
 }
 button.secondary:hover:not(:disabled) {
-  background: #f4f4f5;
+	background: #f4f4f5;
 }
 
 input:focus-visible,
 button:focus-visible {
-  outline: 2px solid #18181b;
-  outline-offset: 3px;
+	outline: 2px solid #18181b;
+	outline-offset: 3px;
 }
 
 input:disabled,
 button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+	opacity: 0.6;
+	cursor: not-allowed;
 }
