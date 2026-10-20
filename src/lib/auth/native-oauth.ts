@@ -4,35 +4,56 @@ const RETURN_PATH_KEY = "supacapacitor:oauth:return-path";
 type Listener = { remove(): Promise<void> };
 type AuthError = { message: string } | null;
 
-// keep platform IO at the boundary so callback and lifecycle behavior can be tested
-// without opening a browser or contacting an auth provider
 type Dependencies = {
 	auth: {
 		signInWithOAuth(options: {
 			provider: "google";
-			options: { redirectTo: string; skipBrowserRedirect: true };
-		}): Promise<{ data: { url: string | null }; error: AuthError }>;
+			options: {
+				redirectTo: string;
+				skipBrowserRedirect: true;
+			};
+		}): Promise<{
+			data: { url: string | null };
+			error: AuthError;
+		}>;
+
 		exchangeCodeForSession(code: string): Promise<{
 			data: { session: unknown | null };
 			error: AuthError;
 		}>;
 	};
+
 	app: {
-		addListener(event: "appUrlOpen", listener: (event: { url: string }) => void): Promise<Listener>;
+		addListener(
+			event: "appUrlOpen",
+			listener: (event: { url: string }) => void,
+		): Promise<Listener>;
+
 		getLaunchUrl(): Promise<{ url: string } | undefined>;
 	};
+
 	browser: {
 		open(options: { url: string }): Promise<void>;
 		close(): Promise<void>;
-		addListener(event: "browserFinished", listener: () => void): Promise<Listener>;
+
+		addListener(
+			event: "browserFinished",
+			listener: () => void,
+		): Promise<Listener>;
 	};
+
 	storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
 	onSignedIn(path: string): Promise<void>;
 	onError(message: string): void;
 };
 
 export function localReturnPath(path: string): string {
-	return path.startsWith("/") && !path.startsWith("//") && !/[\\\u0000-\u0020]/.test(path)
+	return (
+		path.startsWith("/") &&
+		!path.startsWith("//") &&
+		!/[\\\u0000-\u0020]/.test(path)
+	)
 		? path
 		: "/app";
 }
@@ -42,31 +63,46 @@ export function createNativeOAuth(deps: Dependencies) {
 	let listeners: Listener[] = [];
 	let inFlight = false;
 	let handlingCallback = false;
+
 	const handledCallbacks = new Set<string>();
 
+	function reportError(error: unknown) {
+		deps.onError(
+			error instanceof Error
+				? error.message
+				: "Unable to finish Google sign-in.",
+		);
+	}
+
 	async function closeBrowser() {
-		// cold-start callback can arrive without a browser controller to close
+		// cold-start callback may arrive without a browser controller to close
 		await deps.browser.close().catch(() => {});
 	}
 
 	async function handleUrl(raw: string) {
 		let url: URL;
+
 		try {
 			url = new URL(raw);
 		} catch {
 			return;
 		}
+
 		const callback = new URL(NATIVE_AUTH_CALLBACK);
+
 		if (
-			url.protocol !== callback.protocol || url.host !== callback.host ||
-			url.pathname !== callback.pathname || url.username || url.password || url.hash ||
-			handledCallbacks.has(raw) || handlingCallback
+			url.protocol !== callback.protocol ||
+			url.host !== callback.host ||
+			url.pathname !== callback.pathname ||
+			url.username ||
+			url.password ||
+			url.hash ||
+			handledCallbacks.has(raw) ||
+			handlingCallback
 		) {
 			return;
 		}
 
-		// persist only the destination, never the code/tokens
-		// this also marks an app-initiated attempt and survives process termination during sign-in
 		const returnPath = deps.storage.getItem(RETURN_PATH_KEY);
 		if (!returnPath) {
 			return;
@@ -74,10 +110,13 @@ export function createNativeOAuth(deps: Dependencies) {
 
 		handledCallbacks.add(raw);
 		handlingCallback = true;
-		deps.storage.removeItem(RETURN_PATH_KEY);
 
 		try {
-			const error = url.searchParams.get("error_description") || url.searchParams.get("error");
+			deps.storage.removeItem(RETURN_PATH_KEY);
+
+			const error =
+				url.searchParams.get("error_description") ||
+				url.searchParams.get("error");
 			if (error) {
 				throw new Error(error);
 			}
@@ -100,53 +139,97 @@ export function createNativeOAuth(deps: Dependencies) {
 			await deps.onSignedIn(localReturnPath(returnPath));
 		} catch (error) {
 			await closeBrowser();
-			deps.onError(error instanceof Error ? error.message : "Unable to finish Google sign-in.");
+			reportError(error);
 		} finally {
 			handlingCallback = false;
 			inFlight = false;
 		}
 	}
 
+	function handleBrowserFinished() {
+		if (handlingCallback) {
+			return;
+		}
+
+		let cancelled = false;
+
+		try {
+			if (!deps.storage.getItem(RETURN_PATH_KEY)) {
+				return;
+			}
+
+			cancelled = true;
+			deps.storage.removeItem(RETURN_PATH_KEY);
+		} catch (error) {
+			reportError(error);
+			return;
+		} finally {
+			// reset even if reading or removing the stored path throws
+			inFlight = false;
+		}
+
+		if (cancelled) {
+			deps.onError(
+				"Google sign-in was cancelled. You can try again.",
+			);
+		}
+	}
+
 	async function initialize() {
 		if (!ready) {
 			ready = (async () => {
-				listeners.push(await deps.app.addListener("appUrlOpen", ({ url }) => {
-					void handleUrl(url);
-				}));
+				listeners.push(
+					await deps.app.addListener("appUrlOpen", ({ url }) => {
+						void handleUrl(url).catch(reportError);
+					}),
+				);
 
-				listeners.push(await deps.browser.addListener("browserFinished", () => {
-					if (handlingCallback || !deps.storage.getItem(RETURN_PATH_KEY)) return;
-					deps.storage.removeItem(RETURN_PATH_KEY);
-					inFlight = false;
-					deps.onError("Google sign-in was cancelled. You can try again.");
-				}));
+				listeners.push(
+					await deps.browser.addListener(
+						"browserFinished",
+						handleBrowserFinished,
+					),
+				);
 
 				const launch = await deps.app.getLaunchUrl();
 				if (launch) {
 					await handleUrl(launch.url);
 				}
 			})().catch(async (error) => {
-				await Promise.all(listeners.map((listener) => listener.remove()));
+				await Promise.all(
+					listeners.map((listener) => listener.remove()),
+				);
+
 				listeners = [];
 				ready = undefined;
 				throw error;
 			});
 		}
+
 		await ready;
 	}
 
 	async function signIn(returnPath: string) {
 		await initialize();
+
 		if (inFlight || handlingCallback) {
 			throw new Error("Google sign-in is already in progress.");
 		}
 
 		inFlight = true;
+
 		try {
-			deps.storage.setItem(RETURN_PATH_KEY, localReturnPath(returnPath));
+			deps.storage.setItem(
+				RETURN_PATH_KEY,
+				localReturnPath(returnPath),
+			);
+
 			const { data, error } = await deps.auth.signInWithOAuth({
 				provider: "google",
-				options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
+				options: {
+					redirectTo: NATIVE_AUTH_CALLBACK,
+					skipBrowserRedirect: true,
+				},
 			});
 
 			if (error) {
@@ -159,15 +242,25 @@ export function createNativeOAuth(deps: Dependencies) {
 
 			await deps.browser.open({ url: data.url });
 		} catch (error) {
-			deps.storage.removeItem(RETURN_PATH_KEY);
-			inFlight = false;
+			try {
+				deps.storage.removeItem(RETURN_PATH_KEY);
+			} catch {
+				// Preserve the original sign-in error if cleanup also fails.
+			} finally {
+				inFlight = false;
+			}
+
 			throw error;
 		}
 	}
 
 	async function dispose() {
 		await ready?.catch(() => {});
-		await Promise.all(listeners.map((listener) => listener.remove()));
+
+		await Promise.all(
+			listeners.map((listener) => listener.remove()),
+		);
+
 		listeners = [];
 		ready = undefined;
 	}
