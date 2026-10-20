@@ -1,36 +1,55 @@
 <script lang="ts">
 	import "../app.css";
 	import favicon from "#lib/assets/favicon.svg";
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import type { LayoutProps } from "./$types";
 	import { invalidate } from "$app/navigation";
 	import { page } from "$app/state";
-	import { initializeNativeGoogleAuth, nativeAuthError } from "#lib/auth/google.ts";
+	import { provideGoogleAuth } from "#lib/auth/google.svelte.ts";
 
 	let { children, data }: LayoutProps = $props();
 	const { supabase, authClaims } = $derived(data);
+
+	const googleAuth = provideGoogleAuth(untrack(() => supabase.auth));
 
 	onMount(() => {
 		let disposed = false;
 		let disposeNativeAuth: (() => Promise<void>) | undefined;
 
-		void initializeNativeGoogleAuth().then((dispose) => {
+		function disposeSafely(dispose: () => Promise<void>) {
+			void dispose().catch((error) => {
+				console.error("Unable to dispose native Google auth.", error);
+			});
+		}
+
+		void googleAuth.initialize().then((dispose) => {
 			if (disposed) {
-				void dispose();
+				disposeSafely(dispose);
 			} else {
 				disposeNativeAuth = dispose;
 			}
-		}).catch(() => nativeAuthError.set("Unable to initialize iOS sign-in. Please restart the app."));
+		}).catch((error) => {
+			console.error("Unable to initialize native Google auth.", error);
+
+			if (!disposed) {
+				googleAuth.error =
+					"Unable to initialize iOS sign-in. Please restart the app.";
+			}
+		});
 
 		const { data } = supabase.auth.onAuthStateChange((event, _session) => {
 			if (_session?.expires_at !== authClaims?.exp || _session?.user.id !== authClaims?.sub) {
 				invalidate("supabase:auth");
 			}
 		});
+
 		return () => {
 			disposed = true;
 			data.subscription.unsubscribe();
-			void disposeNativeAuth?.();
+
+			if (disposeNativeAuth) {
+				disposeSafely(disposeNativeAuth);
+			}
 		};
 	});
 </script>
@@ -43,8 +62,8 @@
 	<a href="/">Home</a>
 {/if}
 
-{#if $nativeAuthError}
-	<p class="native-auth-error" role="alert">{$nativeAuthError}</p>
+{#if googleAuth.error}
+	<p class="native-auth-error" role="alert">{googleAuth.error}</p>
 {/if}
 
 {@render children()}

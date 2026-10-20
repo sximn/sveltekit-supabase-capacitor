@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { supabase } from "#lib/supabase/client.ts";
-	import { signInWithGoogle } from "#lib/auth/google.ts";
+	import { getGoogleAuth } from "#lib/auth/google.svelte.ts";
 	import type { HTMLAttributes } from "svelte/elements";
 
 	type Props = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -16,6 +16,8 @@
 		class: className = "",
 		...props
 	}: Props = $props();
+	
+	const googleAuth = getGoogleAuth();
 
 	let email = $state("");
 	let password = $state("");
@@ -70,7 +72,7 @@
 		message = null;
 
 		try {
-			await signInWithGoogle(authCallbackTo, redirectTo);
+			await googleAuth.signIn(authCallbackTo, redirectTo);
 		} catch (cause: unknown) {
 			error =
 				cause instanceof Error
