@@ -15,7 +15,7 @@ export class GoogleAuth {
 	constructor(private readonly auth: SupabaseClient["auth"]) {}
 
 	private getNativeOAuth() {
-		return this.nativeOAuth ??= createNativeOAuth({
+		return (this.nativeOAuth ??= createNativeOAuth({
 			auth: this.auth,
 			app: App,
 			browser: Browser,
@@ -28,7 +28,7 @@ export class GoogleAuth {
 			onError: (message) => {
 				this.error = message;
 			},
-		});
+		}));
 	}
 
 	async initialize(): Promise<() => Promise<void>> {
@@ -67,9 +67,10 @@ export class GoogleAuth {
 				throw error;
 			}
 		} catch (error) {
-			this.error = error instanceof Error
-				? error.message
-				: "Unable to start Google sign-in.";
+			this.error =
+				error instanceof Error
+					? error.message
+					: "Unable to start Google sign-in.";
 
 			throw error;
 		}

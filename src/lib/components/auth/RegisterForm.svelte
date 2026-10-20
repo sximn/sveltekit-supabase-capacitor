@@ -16,7 +16,7 @@
 		class: className = "",
 		...props
 	}: Props = $props();
-	
+
 	const googleAuth = getGoogleAuth();
 
 	let email = $state("");

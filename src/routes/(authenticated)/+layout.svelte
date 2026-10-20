@@ -8,7 +8,7 @@
 	console.log({ url: page.url, route: page.route });
 
 	const redirectTo = $derived(
-		page.url.pathname + (browser ? page.url.search : '')
+		page.url.pathname + (browser ? page.url.search : ""),
 	);
 </script>
 

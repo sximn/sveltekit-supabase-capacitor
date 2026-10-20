@@ -49,11 +49,9 @@ type Dependencies = {
 };
 
 export function localReturnPath(path: string): string {
-	return (
-		path.startsWith("/") &&
+	return path.startsWith("/") &&
 		!path.startsWith("//") &&
 		!/[\\\u0000-\u0020]/.test(path)
-	)
 		? path
 		: "/app";
 }
@@ -123,7 +121,9 @@ export function createNativeOAuth(deps: Dependencies) {
 
 			const code = url.searchParams.get("code");
 			if (!code) {
-				throw new Error("The sign-in callback did not contain an authorization code. Please try again.");
+				throw new Error(
+					"The sign-in callback did not contain an authorization code. Please try again.",
+				);
 			}
 
 			const result = await deps.auth.exchangeCodeForSession(code);
@@ -169,9 +169,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		}
 
 		if (cancelled) {
-			deps.onError(
-				"Google sign-in was cancelled. You can try again.",
-			);
+			deps.onError("Google sign-in was cancelled. You can try again.");
 		}
 	}
 
@@ -196,9 +194,7 @@ export function createNativeOAuth(deps: Dependencies) {
 					await handleUrl(launch.url);
 				}
 			})().catch(async (error) => {
-				await Promise.all(
-					listeners.map((listener) => listener.remove()),
-				);
+				await Promise.all(listeners.map((listener) => listener.remove()));
 
 				listeners = [];
 				ready = undefined;
@@ -219,10 +215,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		inFlight = true;
 
 		try {
-			deps.storage.setItem(
-				RETURN_PATH_KEY,
-				localReturnPath(returnPath),
-			);
+			deps.storage.setItem(RETURN_PATH_KEY, localReturnPath(returnPath));
 
 			const { data, error } = await deps.auth.signInWithOAuth({
 				provider: "google",
@@ -257,9 +250,7 @@ export function createNativeOAuth(deps: Dependencies) {
 	async function dispose() {
 		await ready?.catch(() => {});
 
-		await Promise.all(
-			listeners.map((listener) => listener.remove()),
-		);
+		await Promise.all(listeners.map((listener) => listener.remove()));
 
 		listeners = [];
 		ready = undefined;

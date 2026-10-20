@@ -22,23 +22,29 @@
 			});
 		}
 
-		void googleAuth.initialize().then((dispose) => {
-			if (disposed) {
-				disposeSafely(dispose);
-			} else {
-				disposeNativeAuth = dispose;
-			}
-		}).catch((error) => {
-			console.error("Unable to initialize native Google auth.", error);
+		void googleAuth
+			.initialize()
+			.then((dispose) => {
+				if (disposed) {
+					disposeSafely(dispose);
+				} else {
+					disposeNativeAuth = dispose;
+				}
+			})
+			.catch((error) => {
+				console.error("Unable to initialize native Google auth.", error);
 
-			if (!disposed) {
-				googleAuth.error =
-					"Unable to initialize iOS sign-in. Please restart the app.";
-			}
-		});
+				if (!disposed) {
+					googleAuth.error =
+						"Unable to initialize iOS sign-in. Please restart the app.";
+				}
+			});
 
 		const { data } = supabase.auth.onAuthStateChange((event, _session) => {
-			if (_session?.expires_at !== authClaims?.exp || _session?.user.id !== authClaims?.sub) {
+			if (
+				_session?.expires_at !== authClaims?.exp ||
+				_session?.user.id !== authClaims?.sub
+			) {
 				invalidate("supabase:auth");
 			}
 		});
