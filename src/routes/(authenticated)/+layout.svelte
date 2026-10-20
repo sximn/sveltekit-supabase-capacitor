@@ -1,12 +1,15 @@
 <script lang="ts">
 	import AuthGuard from "#lib/components/auth/AuthGuard.svelte";
 	import { supabase } from "#lib/supabase/client.js";
+	import { browser } from "$app/env";
 	import { page } from "$app/state";
 
 	let { children, data } = $props();
 	console.log({ url: page.url, route: page.route });
 
-	const redirectTo = $derived(`${page.url.pathname}${page.url.search}`);
+	const redirectTo = $derived(
+		page.url.pathname + (browser ? page.url.search : '')
+	);
 </script>
 
 {#if data.userId}
