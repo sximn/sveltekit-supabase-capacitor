@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { supabase } from "#lib/supabase/client.ts";
+	import { signInWithGoogle } from "#lib/auth/google.ts";
 	import type { HTMLAttributes } from "svelte/elements";
 
 	type Props = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -69,19 +70,13 @@
 		message = null;
 
 		try {
-			const { error: authError } = await supabase.auth.signInWithOAuth({
-				provider: "google",
-				options: {
-					redirectTo: new URL(authCallbackTo, window.location.origin).href,
-				},
-			});
-
-			if (authError) throw authError;
+			await signInWithGoogle(authCallbackTo, redirectTo);
 		} catch (cause: unknown) {
 			error =
 				cause instanceof Error
 					? cause.message
 					: "Unable to continue with Google.";
+		} finally {
 			pending = null;
 		}
 	}

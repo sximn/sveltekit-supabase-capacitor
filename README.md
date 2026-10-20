@@ -1,54 +1,49 @@
-# sv
+## Google OAuth on iOS
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+The web app uses Supabase's normal browser redirect flow. On iOS, Google sign-in
+opens a Safari browser controller through `@capacitor/browser`. The app uses PKCE
+and receives the result through `@capacitor/app`, exchanges the code in the
+original WebView, and restores the page that started sign-in. No application
+backend or Google client secret is needed in the app.
 
-## Creating a project
+The iOS URL scheme is registered in `ios/App/App/Info.plist`. In Supabase
+Authentication → URL Configuration → Redirect URLs, allow this exact URL:
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
+```text
+com.supacapacitor.app://auth/callback
 ```
 
-To recreate this project with the same configuration:
+Keep the Google Console authorized redirect pointing at Supabase's
+`https://<project-ref>.supabase.co/auth/v1/callback`. Keep your existing web return
+URLs in Supabase's allowlist as well. When changing the app identity, update both
+the native URL registration and `NATIVE_AUTH_CALLBACK` in
+`src/lib/auth/native-oauth.ts`, then update the Supabase allowlist.
+
+After editing the frontend or installing plugins:
 
 ```sh
-# recreate this project
-npx sv@1.1.1 create --template minimal --types ts --add sveltekit-adapter="adapter:static" --install npm ./sveltekit-supabase-capacitor
+npm run ios:sync
+npm run ios:open
 ```
 
-## Adding features
+`ios:sync` builds the static site and synchronizes its assets and plugins into
+iOS. Build and run the **App** scheme in Xcode on a simulator or device. Opening
+Xcode alone does not update its copied web assets.
 
-Add features to your project with `sv add`:
+Verification:
 
 ```sh
-npx sv add
+npm run check
+npm test
 ```
 
-For example, to add Tailwind CSS:
+The tests cover callback validation, warm/cold starts, cancellation, provider
+errors, expired codes, duplicate callbacks, and overlapping sign-in attempts.
+They mock the platform and auth service; also test a real Google login, app
+restart after login, signout, and dismissing the browser followed by retrying.
+Native tokens and the PKCE verifier remain in Supabase's WebView storage. The
+app stores only the return path separately so a cold-start callback can finish.
 
-```sh
-npx sv add tailwindcss
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
+iOS Google OAuth is configured here. Android URL registration and native email
+confirmation/password-recovery flows need their own setup; the existing email
+forms are unchanged.
