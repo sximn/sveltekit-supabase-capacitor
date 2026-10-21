@@ -5,12 +5,12 @@
 	import type { LayoutProps } from "./$types";
 	import { invalidate } from "$app/navigation";
 	import { page } from "$app/state";
-	import { provideGoogleAuth } from "#lib/auth/google.svelte.ts";
+	import { provideOAuth } from "#lib/auth/oauth.svelte.ts";
 
 	let { children, data }: LayoutProps = $props();
 	const { supabase, authClaims } = $derived(data);
 
-	const googleAuth = provideGoogleAuth(untrack(() => supabase.auth));
+	const oauth = provideOAuth(untrack(() => supabase.auth));
 
 	onMount(() => {
 		let disposed = false;
@@ -18,11 +18,11 @@
 
 		function disposeSafely(dispose: () => Promise<void>) {
 			void dispose().catch((error) => {
-				console.error("Unable to dispose native Google auth.", error);
+				console.error("Unable to dispose native OAuth.", error);
 			});
 		}
 
-		void googleAuth
+		void oauth
 			.initialize()
 			.then((dispose) => {
 				if (disposed) {
@@ -32,10 +32,10 @@
 				}
 			})
 			.catch((error) => {
-				console.error("Unable to initialize native Google auth.", error);
+				console.error("Unable to initialize native OAuth.", error);
 
 				if (!disposed) {
-					googleAuth.error =
+					oauth.error =
 						"Unable to initialize iOS sign-in. Please restart the app.";
 				}
 			});
@@ -68,14 +68,14 @@
 	<a href="/">Home</a>
 {/if}
 
-{#if googleAuth.error}
-	<p class="native-auth-error" role="alert">{googleAuth.error}</p>
+{#if oauth.error}
+	<p class="oauth-error" role="alert">{oauth.error}</p>
 {/if}
 
 {@render children()}
 
 <style>
-	.native-auth-error {
+	.oauth-error {
 		padding: 1rem;
 		color: #b91c1c;
 	}

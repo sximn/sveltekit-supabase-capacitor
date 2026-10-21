@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { setImmediate } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
 import { createNativeOAuth, localReturnPath, NATIVE_AUTH_CALLBACK } from "../src/lib/auth/native-oauth.ts";
+import { getOAuthOptions, getOAuthProvider } from "../src/lib/auth/providers.ts";
 
 function harness(
 	storage = new Map<string, string>(),
@@ -22,7 +23,7 @@ function harness(
 		auth: auth ?? {
 			async signInWithOAuth(options) {
 				calls.signIns.push(options);
-				return { data: { url: "https://example.supabase.co/auth/v1/authorize?provider=google" }, error: null };
+				return { data: { url: `https://example.supabase.co/auth/v1/authorize?provider=${options.provider}` }, error: null };
 			},
 			async exchangeCodeForSession(code) {
 				calls.exchanges.push(code);
@@ -67,7 +68,7 @@ function harness(
 
 test("native sign-in requests the registered PKCE callback without navigating the WebView", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app?tab=profile");
+	await h.oauth.signIn("google", "/app?tab=profile");
 	assert.deepEqual(h.calls.signIns, [{
 		provider: "google", options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
 	}]);
@@ -76,9 +77,55 @@ test("native sign-in requests the registered PKCE callback without navigating th
 	await h.oauth.dispose();
 });
 
+for (const provider of ["google", "apple", "facebook", "github"] as const) {
+	test(`${provider} uses the same native browser and callback exchange`, async () => {
+		const h = harness();
+		await h.oauth.signIn(provider, "/app");
+		assert.deepEqual(h.calls.signIns, [{
+			provider, options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
+		}]);
+		assert.equal(new URL(h.calls.opened[0]).searchParams.get("provider"), provider);
+		await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=${provider}-code`);
+		assert.deepEqual(h.calls.exchanges, [`${provider}-code`]);
+		assert.deepEqual(h.calls.paths, ["/app"]);
+		assert.deepEqual(h.calls.errors, []);
+		await h.oauth.dispose();
+	});
+}
+
+test("provider scopes and query parameters are passed through without changing the native callback", async () => {
+	const h = harness();
+	const options = { scopes: "read:user user:email", queryParams: { allow_signup: "false" } };
+	await h.oauth.signIn("github", "/app", options);
+	assert.deepEqual(h.calls.signIns, [{
+		provider: "github",
+		options: { ...options, redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
+	}]);
+	await h.oauth.dispose();
+});
+
+test("only explicitly enabled providers are selectable", () => {
+	const providers = [
+		{ id: "google", label: "Google", enabled: true },
+		{ id: "apple", label: "Apple", enabled: false },
+	] as const;
+	assert.equal(getOAuthProvider("google", providers).label, "Google");
+	assert.throws(() => getOAuthProvider("apple", providers), /not enabled/);
+	assert.throws(() => getOAuthProvider("discord", providers), /not enabled/);
+	assert.equal(getOAuthProvider("apple", [{ id: "apple", label: "Apple", enabled: true }]).id, "apple");
+});
+
+test("provider options exclude credentials and transport settings", () => {
+	const config = {
+		scopes: "email", queryParams: { prompt: "consent" },
+		clientSecret: "must-not-forward", redirectTo: "https://example.test", skipBrowserRedirect: false,
+	};
+	assert.deepEqual(getOAuthOptions(config), { scopes: "email", queryParams: { prompt: "consent" } });
+});
+
 test("a warm callback exchanges once, persists no code, and returns to the requested page", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app?tab=profile");
+	await h.oauth.signIn("google", "/app?tab=profile");
 	h.finishOnClose();
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=one-time-code`);
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=one-time-code`);
@@ -92,7 +139,7 @@ test("a warm callback exchanges once, persists no code, and returns to the reque
 test("a cold-start callback completes the attempt saved by a previous app process", async () => {
 	const storage = new Map<string, string>();
 	const first = harness(storage);
-	await first.oauth.signIn("/app");
+	await first.oauth.signIn("google", "/app");
 	await first.oauth.dispose();
 	const restarted = harness(storage, `${NATIVE_AUTH_CALLBACK}?code=cold-code`);
 	await restarted.oauth.initialize();
@@ -104,7 +151,7 @@ test("a cold-start callback completes the attempt saved by a previous app proces
 
 test("unrelated and malformed deep links cannot consume a pending sign-in", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	for (const url of [
 		"not a URL", "https://auth/callback?code=wrong", "com.other.app://auth/callback?code=wrong",
 		"com.supacapacitor.app://other/callback?code=wrong", "com.supacapacitor.app://auth/other?code=wrong",
@@ -126,22 +173,22 @@ test("unsolicited or stale launch callbacks never establish a session", async ()
 
 test("provider denial is displayed, closes the browser, and permits retry", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?error=access_denied&error_description=User%20denied%20access`);
 	assert.deepEqual(h.calls.errors, ["User denied access"]);
 	assert.deepEqual(h.calls.exchanges, []);
 	assert.deepEqual(h.calls.paths, []);
 	assert.equal(h.calls.closed, 1);
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	assert.equal(h.calls.signIns.length, 2);
 });
 
 test("exchange failures and missing codes do not navigate or leave an active attempt", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	await h.openUrl(NATIVE_AUTH_CALLBACK);
 	assert.match(h.calls.errors[0], /authorization code/);
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	h.failExchange();
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=expired`);
 	assert.equal(h.calls.errors[1], "Expired code");
@@ -151,29 +198,29 @@ test("exchange failures and missing codes do not navigate or leave an active att
 
 test("browser cancellation resets the attempt and allows another sign-in", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	h.finish();
 	assert.match(h.calls.errors[0], /cancelled/);
 	assert.equal(h.storage.size, 0);
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=after-cancellation`);
 	assert.deepEqual(h.calls.exchanges, []);
-	await h.oauth.signIn("/app");
+	await h.oauth.signIn("google", "/app");
 	assert.equal(h.calls.opened.length, 2);
 });
 
 test("overlapping sign-ins cannot overwrite the PKCE verifier", async () => {
 	const h = harness();
-	await h.oauth.signIn("/app");
-	await assert.rejects(h.oauth.signIn("/"), /already in progress/);
+	await h.oauth.signIn("google", "/app");
+	await assert.rejects(h.oauth.signIn("google", "/"), /already in progress/);
 	assert.equal(h.calls.signIns.length, 1);
 });
 
 test("browser opening failures release the attempt", async () => {
 	const h = harness();
 	h.failOpen();
-	await assert.rejects(h.oauth.signIn("/app"), /Browser unavailable/);
+	await assert.rejects(h.oauth.signIn("google", "/app"), /Browser unavailable/);
 	assert.equal(h.storage.size, 0);
-	await assert.rejects(h.oauth.signIn("/app"), /Browser unavailable/);
+	await assert.rejects(h.oauth.signIn("google", "/app"), /Browser unavailable/);
 	assert.equal(h.calls.signIns.length, 2);
 });
 
@@ -223,7 +270,7 @@ test("the real Supabase SDK restores the PKCE verifier and persists a session ac
 		});
 	}
 	const first = harness(storage, undefined, client().auth);
-	await first.oauth.signIn("/app");
+	await first.oauth.signIn("google", "/app");
 	const authorize = new URL(first.calls.opened[0]);
 	assert.equal(authorize.searchParams.get("code_challenge_method"), "s256");
 	assert.ok(authorize.searchParams.get("code_challenge"));

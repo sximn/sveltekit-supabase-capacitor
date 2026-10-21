@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { supabase } from "#lib/supabase/client.ts";
-	import { getGoogleAuth } from "#lib/auth/google.svelte.ts";
+	import OAuthButtons from "./OAuthButtons.svelte";
+	import type { OAuthPending } from "#lib/auth/providers.ts";
 	import type { HTMLAttributes } from "svelte/elements";
 
 	type Props = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -17,13 +18,11 @@
 		...props
 	}: Props = $props();
 
-	const googleAuth = getGoogleAuth();
-
 	let email = $state("");
 	let password = $state("");
 	let error = $state<string | null>(null);
 	let message = $state<string | null>(null);
-	let pending = $state<"email" | "google" | null>(null);
+	let pending = $state<OAuthPending>(null);
 
 	async function handleRegister(event: SubmitEvent) {
 		event.preventDefault();
@@ -63,32 +62,13 @@
 			pending = null;
 		}
 	}
-
-	async function handleGoogleSignup() {
-		if (pending) return;
-
-		pending = "google";
-		error = null;
-		message = null;
-
-		try {
-			await googleAuth.signIn(authCallbackTo, redirectTo);
-		} catch (cause: unknown) {
-			error =
-				cause instanceof Error
-					? cause.message
-					: "Unable to continue with Google.";
-		} finally {
-			pending = null;
-		}
-	}
 </script>
 
 <div {...props} class={`auth-form ${className}`}>
 	<section class="card">
 		<header>
 			<h2>Create an account</h2>
-			<p>Sign up with your email or Google account.</p>
+			<p>Create an account to get started.</p>
 		</header>
 
 		<div class="content" aria-busy={pending !== null}>
@@ -132,16 +112,15 @@
 				</button>
 			</form>
 
-			<div class="divider"><span>or</span></div>
-
-			<button
-				class="secondary"
-				type="button"
-				onclick={handleGoogleSignup}
-				disabled={pending !== null}
-			>
-				{pending === "google" ? "Redirecting..." : "Continue with Google"}
-			</button>
+			<OAuthButtons
+				{redirectTo}
+				{authCallbackTo}
+				bind:pending
+				onstart={() => {
+					error = null;
+					message = null;
+				}}
+			/>
 		</div>
 	</section>
 </div>
@@ -178,22 +157,5 @@
 	}
 	.success {
 		color: #15803d;
-	}
-
-	.divider {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin: 1.25rem 0;
-		color: #71717a;
-		font-size: 0.875rem;
-	}
-
-	.divider::before,
-	.divider::after {
-		content: "";
-		flex: 1;
-		height: 1px;
-		background: #e4e4e7;
 	}
 </style>

@@ -1,3 +1,5 @@
+import type { OAuthProvider, OAuthProviderOptions } from "./providers.ts";
+
 export const NATIVE_AUTH_CALLBACK = "com.supacapacitor.app://auth/callback";
 const RETURN_PATH_KEY = "supacapacitor:oauth:return-path";
 
@@ -7,8 +9,8 @@ type AuthError = { message: string } | null;
 type Dependencies = {
 	auth: {
 		signInWithOAuth(options: {
-			provider: "google";
-			options: {
+			provider: OAuthProvider;
+			options: OAuthProviderOptions & {
 				redirectTo: string;
 				skipBrowserRedirect: true;
 			};
@@ -68,7 +70,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		deps.onError(
 			error instanceof Error
 				? error.message
-				: "Unable to finish Google sign-in.",
+				: "Unable to finish sign-in.",
 		);
 	}
 
@@ -169,7 +171,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		}
 
 		if (cancelled) {
-			deps.onError("Google sign-in was cancelled. You can try again.");
+			deps.onError("Sign-in was cancelled. You can try again.");
 		}
 	}
 
@@ -205,11 +207,11 @@ export function createNativeOAuth(deps: Dependencies) {
 		await ready;
 	}
 
-	async function signIn(returnPath: string) {
+	async function signIn(provider: OAuthProvider, returnPath: string, options: OAuthProviderOptions = {}) {
 		await initialize();
 
 		if (inFlight || handlingCallback) {
-			throw new Error("Google sign-in is already in progress.");
+			throw new Error("Sign-in is already in progress.");
 		}
 
 		inFlight = true;
@@ -218,8 +220,9 @@ export function createNativeOAuth(deps: Dependencies) {
 			deps.storage.setItem(RETURN_PATH_KEY, localReturnPath(returnPath));
 
 			const { data, error } = await deps.auth.signInWithOAuth({
-				provider: "google",
+				provider,
 				options: {
+					...options,
 					redirectTo: NATIVE_AUTH_CALLBACK,
 					skipBrowserRedirect: true,
 				},
@@ -230,7 +233,7 @@ export function createNativeOAuth(deps: Dependencies) {
 			}
 
 			if (!data.url) {
-				throw new Error("Google sign-in did not return an authorization URL.");
+				throw new Error("Sign-in did not return an authorization URL.");
 			}
 
 			await deps.browser.open({ url: data.url });
