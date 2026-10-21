@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">sveltekit-supabase-capacitor</string>
-    <string name="title_activity_main">sveltekit-supabase-capacitor</string>
-    <string name="package_name">com.sajbo.sksupacap</string>
-    <string name="custom_url_scheme">com.sajbo.sksupacap</string>
+    <string name="app_name">SupaCapacitor Starter</string>
+    <string name="title_activity_main">SupaCapacitor Starter</string>
+    <string name="package_name">com.supacapacitor.app</string>
+    <string name="custom_url_scheme">com.supacapacitor.app</string>
 </resources>

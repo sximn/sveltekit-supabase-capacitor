@@ -1,51 +1,82 @@
 <script lang="ts">
-  import { goto, invalidate } from '$app/navigation'
-  import { PUBLIC_SERVER_URL } from '$env/static/public';
+	import "../app.css";
+	import favicon from "#lib/assets/favicon.svg";
+	import { onMount, untrack } from "svelte";
+	import type { LayoutProps } from "./$types";
+	import { invalidate } from "$app/navigation";
+	import { page } from "$app/state";
+	import { provideOAuth } from "#lib/auth/oauth.svelte.ts";
 
-  let { data, children } = $props()
-  let { supabase, session } = $state(data)
+	let { children, data }: LayoutProps = $props();
+	const { supabase, authClaims } = $derived(data);
 
-  $effect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, _session) => {
-      if (_session?.expires_at !== session?.expires_at) {
-        invalidate('supabase:auth')
-      }
-    })
+	const oauth = provideOAuth(untrack(() => supabase.auth));
 
-    return () => subscription.unsubscribe()
-  });
+	onMount(() => {
+		let disposed = false;
+		let disposeNativeAuth: (() => Promise<void>) | undefined;
 
-  async function handleSignout(event: SubmitEvent) {
-    event.preventDefault();
-    console.log("submititngh");
-    try {
-      const response = await fetch(`${PUBLIC_SERVER_URL}/api/v1/auth/signout`, {
-        method: "POST",
-      });
-      
-      if (response.ok) {
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('Signout error:', error);
-    }
-  }
+		function disposeSafely(dispose: () => Promise<void>) {
+			void dispose().catch((error) => {
+				console.error("Unable to dispose native OAuth.", error);
+			});
+		}
+
+		void oauth
+			.initialize()
+			.then((dispose) => {
+				if (disposed) {
+					disposeSafely(dispose);
+				} else {
+					disposeNativeAuth = dispose;
+				}
+			})
+			.catch((error) => {
+				console.error("Unable to initialize native OAuth.", error);
+
+				if (!disposed) {
+					oauth.error =
+						"Unable to initialize native sign-in. Please restart the app.";
+				}
+			});
+
+		const { data } = supabase.auth.onAuthStateChange((event, _session) => {
+			if (
+				_session?.expires_at !== authClaims?.exp ||
+				_session?.user.id !== authClaims?.sub
+			) {
+				invalidate("supabase:auth");
+			}
+		});
+
+		return () => {
+			disposed = true;
+			data.subscription.unsubscribe();
+
+			if (disposeNativeAuth) {
+				disposeSafely(disposeNativeAuth);
+			}
+		};
+	});
 </script>
 
-<nav style="border: solid; border-width: 0 0 2px; padding-bottom: 5px;">
-  <a href="/">Home</a>
-  {#if session}
-    <a href="/app">App</a>
-    <a href="/self">Self</a>
-    <img style="width: 32px; height: 32px; border-radius: 9999px;" src={session.user.user_metadata.avatar_url ?? 'https://api.dicebear.com/8.x/fun-emoji/svg'} alt="person_avatar">
-    <form method="POST" onsubmit={handleSignout}>
-      <button type="submit">Logout</button>
-    </form>
-  {:else}
-    <a href='/auth'>Login</a>
-  {/if}
-</nav>
+<svelte:head>
+	<link rel="icon" href={favicon} />
+</svelte:head>
 
-{@render children?.()}
+{#if page.url.pathname !== "/"}
+	<a href="/">Home</a>
+{/if}
+
+{#if oauth.error}
+	<p class="oauth-error" role="alert">{oauth.error}</p>
+{/if}
+
+{@render children()}
+
+<style>
+	.oauth-error {
+		padding: 1rem;
+		color: #b91c1c;
+	}
+</style>
