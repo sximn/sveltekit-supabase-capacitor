@@ -36,7 +36,7 @@
 
 				if (!disposed) {
 					oauth.error =
-						"Unable to initialize iOS sign-in. Please restart the app.";
+						"Unable to initialize native sign-in. Please restart the app.";
 				}
 			});
 

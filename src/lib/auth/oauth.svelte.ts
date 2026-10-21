@@ -46,7 +46,7 @@ export class OAuth {
 	}
 
 	async initialize(): Promise<() => Promise<void>> {
-		if (Capacitor.getPlatform() !== "ios") {
+		if (!Capacitor.isNativePlatform()) {
 			return async () => {};
 		}
 
@@ -72,10 +72,6 @@ export class OAuth {
 			const options = getOAuthOptions(provider);
 
 			if (Capacitor.isNativePlatform()) {
-				if (Capacitor.getPlatform() !== "ios") {
-					throw new Error("Native OAuth is currently configured for iOS only.");
-				}
-
 				await this.getNativeOAuth().signIn(provider.id, returnPath, options);
 				return;
 			}
