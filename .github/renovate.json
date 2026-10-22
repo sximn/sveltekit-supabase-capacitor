@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["npm", "github-actions"],
+  "timezone": "Europe/Madrid",
+  "schedule": ["* * * * 1"],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@capacitor/*"],
+      "groupName": "capacitor"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["svelte", "@sveltejs/*"],
+      "groupName": "svelte"
+    }
+  ]
+}
