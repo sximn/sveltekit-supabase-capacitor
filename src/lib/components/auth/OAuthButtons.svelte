@@ -42,7 +42,9 @@
 				onclick={() => signIn(provider.id)}
 				disabled={pending !== null}
 			>
-				{pending === provider.id ? "Redirecting..." : `Continue with ${provider.label}`}
+				{pending === provider.id
+					? "Redirecting..."
+					: `Continue with ${provider.label}`}
 			</button>
 		{/each}
 	</div>

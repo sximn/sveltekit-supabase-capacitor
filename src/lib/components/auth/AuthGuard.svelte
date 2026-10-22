@@ -13,7 +13,9 @@
 <div class="auth-wrapper">
 	<div class="auth-container">
 		<h1>Sign in</h1>
-		<p>Continue with your preferred provider to create an account or sign in.</p>
+		<p>
+			Continue with your preferred provider to create an account or sign in.
+		</p>
 		<OAuthButtons {redirectTo} {authCallbackTo} />
 	</div>
 </div>

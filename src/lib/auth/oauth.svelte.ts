@@ -60,7 +60,7 @@ export class OAuth {
 		providerId: OAuthProvider,
 		{
 			returnPath = "/app",
-			authCallbackTo = returnPath
+			authCallbackTo = returnPath,
 		}: {
 			returnPath?: string;
 			authCallbackTo?: string;
@@ -88,7 +88,8 @@ export class OAuth {
 				throw error;
 			}
 		} catch (error) {
-			this.error = error instanceof Error ? error.message : "Unable to start sign-in.";
+			this.error =
+				error instanceof Error ? error.message : "Unable to start sign-in.";
 			throw error;
 		}
 	}
@@ -106,7 +107,9 @@ export function provideOAuth(
 export function getOAuth(): OAuth {
 	const oauth = getContext<OAuth | undefined>(OAUTH_CONTEXT);
 	if (!oauth) {
-		throw new Error("OAuth context is missing. Call provideOAuth() in the root layout.");
+		throw new Error(
+			"OAuth context is missing. Call provideOAuth() in the root layout.",
+		);
 	}
 	return oauth;
 }

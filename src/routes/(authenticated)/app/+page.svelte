@@ -8,5 +8,7 @@
 </main>
 
 <style>
-	main { padding: 1.5rem; }
+	main {
+		padding: 1.5rem;
+	}
 </style>

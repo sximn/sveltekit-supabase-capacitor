@@ -15,7 +15,8 @@
 			const { error } = await supabase.auth.signOut();
 			if (error) throw error;
 		} catch (error) {
-			signOutError = error instanceof Error ? error.message : "Unable to sign out.";
+			signOutError =
+				error instanceof Error ? error.message : "Unable to sign out.";
 		} finally {
 			signingOut = false;
 		}
@@ -29,10 +30,8 @@
 {#if data.userId}
 	<div class="auth-welcome">
 		<p>Signed in</p>
-		<button
-			class="sign-out-btn"
-			disabled={signingOut}
-			onclick={signOut}>{signingOut ? "Signing out..." : "Sign out"}</button
+		<button class="sign-out-btn" disabled={signingOut} onclick={signOut}
+			>{signingOut ? "Signing out..." : "Sign out"}</button
 		>
 	</div>
 	{#if signOutError}

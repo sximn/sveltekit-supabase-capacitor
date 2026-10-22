@@ -69,9 +69,7 @@ export function createNativeOAuth(deps: Dependencies) {
 
 	function reportError(error: unknown) {
 		deps.onError(
-			error instanceof Error
-				? error.message
-				: "Unable to finish sign-in.",
+			error instanceof Error ? error.message : "Unable to finish sign-in.",
 		);
 	}
 
@@ -208,7 +206,11 @@ export function createNativeOAuth(deps: Dependencies) {
 		await ready;
 	}
 
-	async function signIn(provider: OAuthProvider, returnPath: string, options: OAuthProviderOptions = {}) {
+	async function signIn(
+		provider: OAuthProvider,
+		returnPath: string,
+		options: OAuthProviderOptions = {},
+	) {
 		await initialize();
 
 		if (inFlight || handlingCallback) {
