@@ -1,6 +1,7 @@
 import type { OAuthProvider, OAuthProviderOptions } from "./providers.ts";
+import app from "../app-config.ts";
 
-export const NATIVE_AUTH_CALLBACK = "com.supacapacitor.app://auth/callback";
+export const NATIVE_AUTH_CALLBACK = `${app.appId}://auth/callback`;
 const RETURN_PATH_KEY = "supacapacitor:oauth:return-path";
 
 type Listener = { remove(): Promise<void> };

@@ -5,7 +5,7 @@ export type OAuthProviderOptions = Pick<
 	NonNullable<SignInWithOAuthCredentials["options"]>,
 	"scopes" | "queryParams"
 >;
-export type OAuthPending = "email" | Provider | null;
+export type OAuthPending = Provider | null;
 
 export type OAuthProviderConfig = OAuthProviderOptions & {
 	id: Provider;

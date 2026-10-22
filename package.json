@@ -1,7 +1,7 @@
 {
 	"name": "sveltekit-supabase-capacitor",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -15,7 +15,8 @@
 		"android:open": "cap open android",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"setup": "node scripts/setup.ts"
 	},
 	"devDependencies": {
 		"@capacitor/cli": "^8.5.3",
@@ -40,5 +41,9 @@
 		"@capacitor/browser": "^8.0.5",
 		"@capacitor/core": "^8.5.3",
 		"@capacitor/ios": "^8.5.3"
+	},
+	"license": "MIT",
+	"engines": {
+		"node": ">=24 <25"
 	}
 }
