@@ -6,6 +6,7 @@
 	import { invalidate } from "$app/navigation";
 	import { page } from "$app/state";
 	import { provideOAuth } from "#lib/auth/oauth.svelte.ts";
+	import AuthLoading from "#lib/components/auth/AuthLoading.svelte";
 
 	let { children, data }: LayoutProps = $props();
 	const { supabase, authClaims } = $derived(data);
@@ -72,7 +73,11 @@
 	<p class="oauth-error" role="alert">{oauth.error}</p>
 {/if}
 
-{@render children()}
+{#if oauth.phase === "initializing" || oauth.phase === "completing"}
+	<AuthLoading message={oauth.phase === "completing" ? "Finishing sign-in..." : "Checking session..."} />
+{:else}
+	{@render children()}
+{/if}
 
 <style>
 	.oauth-error {

@@ -113,6 +113,10 @@ All pages, including the homepage, require JavaScript to render. This keeps the 
 
 This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data. The `(authenticated)` layout controls the sign-in UI, it does not authorize database access.
 
+The shared auth context (`getOAuth()`) exposes reactive `phase`, `pendingProvider`, `busy`, and `error` values for custom UI. The included buttons show a spinner during sign-in and logout. Sign-in stays pending until the web page leaves, or the native callback finishes exchanging its code and updating the route. Logout waits for refreshed session data. Failures and native browser cancellation release the pending state so users can retry.
+
+On web redirects, the root layout waits for Supabase to resolve the session before rendering the app; the HTML shell shows a loading message during that wait. Native callbacks show a loading screen while completing sign-in. Neither callback path depends on receiving an auth event before displaying the resolved session.
+
 ## Checks and CI
 
 ```sh

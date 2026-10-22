@@ -1,9 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { goto, invalidate, replaceState } from "$app/navigation";
+import { goto, invalidate } from "$app/navigation";
 import { page } from "$app/state";
-import { createNativeOAuth } from "./native-oauth.ts";
+import { createNativeOAuth, type NativeOAuthPhase } from "./native-oauth.ts";
 import { initializeWebOAuth } from "./web-oauth.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getContext, setContext } from "svelte";
@@ -13,12 +13,15 @@ import {
 	oauthProviders,
 	type OAuthProvider,
 	type OAuthProviderConfig,
+	type OAuthPending,
 } from "./providers.ts";
 
 const OAUTH_CONTEXT = Symbol("oauth");
 
 export class OAuth {
 	error = $state<string | null>(null);
+	phase = $state<NativeOAuthPhase | "initializing" | "signing-out">("initializing");
+	pendingProvider = $state<OAuthPending>(null);
 	private nativeOAuth: ReturnType<typeof createNativeOAuth> | undefined;
 
 	constructor(
@@ -28,6 +31,10 @@ export class OAuth {
 
 	get enabledProviders() {
 		return this.providers.filter((provider) => provider.enabled);
+	}
+
+	get busy() {
+		return this.phase !== "idle";
 	}
 
 	private getNativeOAuth() {
@@ -44,25 +51,47 @@ export class OAuth {
 			onError: (message) => {
 				this.error = message;
 			},
+			onPhaseChange: (phase) => {
+				this.phase = phase;
+				if (phase === "idle") this.pendingProvider = null;
+			},
 		}));
 	}
 
 	async initialize(): Promise<() => Promise<void>> {
-		if (!Capacitor.isNativePlatform()) {
-			const result = await initializeWebOAuth(this.auth, new URL(window.location.href));
-			this.error = result.error;
-			if (result.url && result.url.href !== window.location.href) {
-				// Preserve router state and the requested route, without replaying the
-				// callback error on reload or carrying it into the next sign-in URL.
-				goto(result.url, { state: page.state, shallow: true, replace: true });
+		try {
+			if (!Capacitor.isNativePlatform()) {
+				const onPageShow = (event: PageTransitionEvent) => {
+					// returning from the provider via browser history can restore this
+					// document with its pre-redirect state still in memory
+					if (event.persisted && this.phase === "redirecting") {
+						this.phase = "idle";
+						this.pendingProvider = null;
+					}
+				};
+				window.addEventListener("pageshow", onPageShow);
+				try {
+					const result = await initializeWebOAuth(this.auth, new URL(window.location.href));
+
+					this.error = result.error;
+
+					if (result.url && result.url.href !== window.location.href) {
+						await goto(result.url, { state: page.state, shallow: true, replace: true });
+					}
+				} catch (error) {
+					window.removeEventListener("pageshow", onPageShow);
+					throw error;
+				}
+				return async () => window.removeEventListener("pageshow", onPageShow);
 			}
-			return async () => {};
+
+			const oauth = this.getNativeOAuth();
+			await oauth.initialize();
+
+			return () => oauth.dispose();
+		} finally {
+			if (this.phase === "initializing") this.phase = "idle";
 		}
-
-		const oauth = this.getNativeOAuth();
-		await oauth.initialize();
-
-		return () => oauth.dispose();
 	}
 
 	async signIn(
@@ -75,7 +104,14 @@ export class OAuth {
 			authCallbackTo?: string;
 		} = {},
 	): Promise<void> {
+		if (this.busy) {
+			throw new Error("Authentication is already in progress.");
+		}
+
+		this.phase = "redirecting";
+		this.pendingProvider = providerId;
 		this.error = null;
+
 		try {
 			const provider = getOAuthProvider(providerId, this.providers);
 			const options = getOAuthOptions(provider);
@@ -85,7 +121,7 @@ export class OAuth {
 				return;
 			}
 
-			const { error } = await this.auth.signInWithOAuth({
+			const { data, error } = await this.auth.signInWithOAuth({
 				provider: provider.id,
 				options: {
 					...options,
@@ -94,12 +130,44 @@ export class OAuth {
 			});
 
 			if (error) {
-				throw error;
+				throw new Error(error.message);
 			}
+			if (!data.url) {
+				throw new Error("Sign-in did not return an authorization URL.");
+			}
+			// keep the pending state until the document actually leaves
+			// the SDK resolving this request doesn't mean navigation has completed
 		} catch (error) {
+			this.phase = "idle";
+			this.pendingProvider = null;
 			this.error =
 				error instanceof Error ? error.message : "Unable to start sign-in.";
 			throw error;
+		}
+	}
+
+	async signOut(): Promise<void> {
+		if (this.busy) {
+			throw new Error("Authentication is already in progress.");
+		}
+
+		this.phase = "signing-out";
+		this.error = null;
+
+		try {
+			const { error } = await this.auth.signOut();
+
+			if (error) {
+				throw new Error(error.message);
+			}
+
+			// Wait for the signed-out layout data, even if the auth event is late.
+			await invalidate("supabase:auth");
+		} catch (error) {
+			this.error = error instanceof Error ? error.message : "Unable to sign out.";
+			throw error;
+		} finally {
+			this.phase = "idle";
 		}
 	}
 }

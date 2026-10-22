@@ -1,24 +1,19 @@
 <script lang="ts">
 	import AuthGuard from "#lib/components/auth/AuthGuard.svelte";
-	import { supabase } from "#lib/supabase/client.js";
+	import { getOAuth } from "#lib/auth/oauth.svelte.ts";
+	import Spinner from "#lib/components/auth/Spinner.svelte";
 	import { browser } from "$app/env";
 	import { page } from "$app/state";
 
 	let { children, data } = $props();
-	let signOutError = $state<string | null>(null);
-	let signingOut = $state(false);
+	const oauth = getOAuth();
+	const signingOut = $derived(oauth.phase === "signing-out");
 
 	async function signOut() {
-		signingOut = true;
-		signOutError = null;
 		try {
-			const { error } = await supabase.auth.signOut();
-			if (error) throw error;
-		} catch (error) {
-			signOutError =
-				error instanceof Error ? error.message : "Unable to sign out.";
-		} finally {
-			signingOut = false;
+			await oauth.signOut();
+		} catch {
+			// The shared auth context displays the error and permits a retry.
 		}
 	}
 
@@ -27,18 +22,18 @@
 	);
 </script>
 
-{#if data.userId}
+{#if data.userId || signingOut}
 	<div class="auth-welcome">
 		<p>Signed in</p>
-		<button class="sign-out-btn" disabled={signingOut} onclick={signOut}
-			>{signingOut ? "Signing out..." : "Sign out"}</button
-		>
+		<button class="sign-out-btn" disabled={oauth.busy} aria-busy={signingOut} onclick={signOut}>
+			{#if signingOut}<Spinner />{/if}
+			{signingOut ? "Signing out..." : "Sign out"}
+		</button>
 	</div>
-	{#if signOutError}
-		<p role="alert">{signOutError}</p>
-	{/if}
 
-	{@render children?.()}
+	{#if data.userId}
+		{@render children?.()}
+	{/if}
 {:else}
 	<AuthGuard {redirectTo} />
 {/if}
@@ -57,6 +52,10 @@
 	}
 
 	.sign-out-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
 		width: fit-content;
 		min-height: 2.75rem;
 		padding: 0.625rem 0.875rem;

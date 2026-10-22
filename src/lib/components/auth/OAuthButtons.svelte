@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getOAuth } from "#lib/auth/oauth.svelte.ts";
 	import type { OAuthPending, OAuthProvider } from "#lib/auth/providers.ts";
+	import Spinner from "./Spinner.svelte";
 
 	let {
 		redirectTo = "/app",
@@ -13,10 +14,15 @@
 		pending?: OAuthPending;
 		onstart?: () => void;
 	} = $props();
+
 	const oauth = getOAuth();
 
+	$effect(() => {
+		pending = oauth.pendingProvider;
+	});
+
 	async function signIn(provider: OAuthProvider) {
-		if (pending) {
+		if (pending || oauth.busy) {
 			return;
 		}
 
@@ -27,8 +33,6 @@
 			await oauth.signIn(provider, { returnPath: redirectTo, authCallbackTo });
 		} catch {
 			// the shared context exposes startup and callback errors in the root layout
-		} finally {
-			pending = null;
 		}
 	}
 </script>
@@ -39,8 +43,10 @@
 			<button
 				type="button"
 				onclick={() => signIn(provider.id)}
-				disabled={pending !== null}
+				disabled={pending !== null || oauth.busy}
+				aria-busy={pending === provider.id}
 			>
+				{#if pending === provider.id}<Spinner />{/if}
 				{pending === provider.id
 					? "Redirecting..."
 					: `Continue with ${provider.label}`}
@@ -58,6 +64,10 @@
 	}
 
 	button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
 		width: 100%;
 		min-height: 2.75rem;
 		padding: 0.625rem 0.875rem;

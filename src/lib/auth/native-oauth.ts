@@ -4,6 +4,8 @@ import app from "../app-config.ts";
 export const NATIVE_AUTH_CALLBACK = `${app.appId}://auth/callback`;
 const RETURN_PATH_KEY = "supacapacitor:oauth:return-path";
 
+export type NativeOAuthPhase = "idle" | "redirecting" | "completing";
+
 type Listener = { remove(): Promise<void> };
 type AuthError = { message: string } | null;
 
@@ -49,6 +51,7 @@ type Dependencies = {
 
 	onSignedIn(path: string): Promise<void>;
 	onError(message: string): void;
+	onPhaseChange?(phase: NativeOAuthPhase): void;
 };
 
 export function localReturnPath(path: string): string {
@@ -68,6 +71,13 @@ export function createNativeOAuth(deps: Dependencies) {
 	const handledCallbacks = new Set<string>();
 
 	function reportError(error: unknown) {
+		const wasInFlight = inFlight;
+		inFlight = false;
+
+		if (wasInFlight || handlingCallback) {
+			deps.onPhaseChange?.("idle");
+		}
+
 		deps.onError(
 			error instanceof Error ? error.message : "Unable to finish sign-in.",
 		);
@@ -109,6 +119,7 @@ export function createNativeOAuth(deps: Dependencies) {
 
 		handledCallbacks.add(raw);
 		handlingCallback = true;
+		deps.onPhaseChange?.("completing");
 
 		try {
 			deps.storage.removeItem(RETURN_PATH_KEY);
@@ -144,6 +155,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		} finally {
 			handlingCallback = false;
 			inFlight = false;
+			deps.onPhaseChange?.("idle");
 		}
 	}
 
@@ -166,7 +178,12 @@ export function createNativeOAuth(deps: Dependencies) {
 			return;
 		} finally {
 			// reset even if reading or removing the stored path throws
+			const wasInFlight = inFlight;
 			inFlight = false;
+
+			if (wasInFlight || cancelled) {
+				deps.onPhaseChange?.("idle");
+			}
 		}
 
 		if (cancelled) {
@@ -218,6 +235,7 @@ export function createNativeOAuth(deps: Dependencies) {
 		}
 
 		inFlight = true;
+		deps.onPhaseChange?.("redirecting");
 
 		try {
 			deps.storage.setItem(RETURN_PATH_KEY, localReturnPath(returnPath));
@@ -247,6 +265,7 @@ export function createNativeOAuth(deps: Dependencies) {
 				// Preserve the original sign-in error if cleanup also fails.
 			} finally {
 				inFlight = false;
+				deps.onPhaseChange?.("idle");
 			}
 
 			throw error;
