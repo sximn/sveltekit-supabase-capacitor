@@ -33,6 +33,9 @@
 	}
 
 	onMount(() => {
+		// The static shell covers startup before the initial layout data is ready.
+		document.getElementById("app-loading")?.remove();
+
 		let disposed = false;
 		let disposeOAuth: (() => Promise<void>) | undefined;
 

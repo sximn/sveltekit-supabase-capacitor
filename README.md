@@ -117,7 +117,7 @@ The shared auth context (`getOAuth()`) exposes reactive `phase`, `pendingProvide
 
 Session-loading failures are returned as `data.sessionError` by the root layout and shown with a Retry action. Retry reloads `supabase:auth` without starting a new sign-in. Protected routes wait for a successful session check before showing app content or sign-in; public pages remain available.
 
-On web redirects, the root layout waits for Supabase to resolve the session before rendering the app; the HTML shell shows a loading message during that wait. Native callbacks show a loading screen while completing sign-in. Neither callback path depends on receiving an auth event before displaying the resolved session.
+On every full page load, including web OAuth returns and native cold starts, the HTML shell shows a loading message while JavaScript starts and the root layout loads the session. The root layout removes this status on mount and shows the existing auth loading UI while initialization or a native callback is still in progress.
 
 ## Checks and CI
 
