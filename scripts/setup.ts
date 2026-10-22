@@ -413,11 +413,7 @@ async function main() {
    are configured separately. See README.md for platform prerequisites.`);
 }
 
-if (
-	process.argv[1] &&
-	import.meta.url ===
-		pathToFileURL(await realpath(resolve(process.argv[1]))).href
-) {
+if (import.meta.main) {
 	main().catch((error) => {
 		console.error(`Setup failed: ${error.message}`);
 		process.exitCode = 1;
