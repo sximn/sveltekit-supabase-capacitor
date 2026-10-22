@@ -408,7 +408,7 @@ async function main() {
    Add other return paths explicitly if you introduce them.
 4. Set Supabase Site URL to your web origin. Provider consoles use:
    https://<project-ref>.supabase.co/auth/v1/callback
-5. Run npm run dev, npm run ios:sync, or npm run android:run.
+5. Run npm run build, npm run ios:sync, npm run android:sync
    Re-sync both native projects after renaming; signing and provider accounts
    are configured separately. See README.md for platform prerequisites.`);
 }
