@@ -1,6 +1,7 @@
 import type { OAuthProvider, OAuthProviderOptions } from "./providers.ts";
+import app from "../app-config.ts";
 
-export const NATIVE_AUTH_CALLBACK = "com.supacapacitor.app://auth/callback";
+export const NATIVE_AUTH_CALLBACK = `${app.appId}://auth/callback`;
 const RETURN_PATH_KEY = "supacapacitor:oauth:return-path";
 
 type Listener = { remove(): Promise<void> };
@@ -68,9 +69,7 @@ export function createNativeOAuth(deps: Dependencies) {
 
 	function reportError(error: unknown) {
 		deps.onError(
-			error instanceof Error
-				? error.message
-				: "Unable to finish sign-in.",
+			error instanceof Error ? error.message : "Unable to finish sign-in.",
 		);
 	}
 
@@ -207,7 +206,11 @@ export function createNativeOAuth(deps: Dependencies) {
 		await ready;
 	}
 
-	async function signIn(provider: OAuthProvider, returnPath: string, options: OAuthProviderOptions = {}) {
+	async function signIn(
+		provider: OAuthProvider,
+		returnPath: string,
+		options: OAuthProviderOptions = {},
+	) {
 		await initialize();
 
 		if (inFlight || handlingCallback) {

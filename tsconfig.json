@@ -6,6 +6,8 @@
 	"include": [
 		"src",
 		"tests",
+		"scripts",
+		"capacitor.config.ts",
 		"vite.config.ts"
 	]
 }

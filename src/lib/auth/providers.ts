@@ -1,11 +1,14 @@
-import type { Provider, SignInWithOAuthCredentials } from "@supabase/supabase-js";
+import type {
+	Provider,
+	SignInWithOAuthCredentials,
+} from "@supabase/supabase-js";
 
 export type OAuthProvider = Provider;
 export type OAuthProviderOptions = Pick<
 	NonNullable<SignInWithOAuthCredentials["options"]>,
 	"scopes" | "queryParams"
 >;
-export type OAuthPending = "email" | Provider | null;
+export type OAuthPending = Provider | null;
 
 export type OAuthProviderConfig = OAuthProviderOptions & {
 	id: Provider;
@@ -26,7 +29,9 @@ export function getOAuthProvider(
 	id: Provider,
 	providers: readonly OAuthProviderConfig[] = oauthProviders,
 ): OAuthProviderConfig {
-	const provider = providers.find((provider) => provider.id === id && provider.enabled);
+	const provider = providers.find(
+		(provider) => provider.id === id && provider.enabled,
+	);
 	if (!provider) {
 		throw new Error("This sign-in provider is not enabled.");
 	}
@@ -34,7 +39,9 @@ export function getOAuthProvider(
 	return provider;
 }
 
-export function getOAuthOptions(provider: OAuthProviderOptions): OAuthProviderOptions {
+export function getOAuthOptions(
+	provider: OAuthProviderOptions,
+): OAuthProviderOptions {
 	return {
 		...(provider.scopes ? { scopes: provider.scopes } : {}),
 		...(provider.queryParams ? { queryParams: provider.queryParams } : {}),

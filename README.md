@@ -90,14 +90,14 @@ npm run dev
 For iOS:
 
 ```sh
-npm run ios:sync
+npm run ios:build:sync
 npm run ios:open
 ```
 
 For Android:
 
 ```sh
-npm run android:sync
+npm run android:build:sync
 npm run android:open
 ```
 

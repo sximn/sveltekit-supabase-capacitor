@@ -1,19 +1,30 @@
-<script>
-	import { onMount } from "svelte";
-
-	let { data } = $props();
-	const { supabase } = $derived(data);
-
-	async function getData() {
-		const channels = supabase.getChannels();
-		console.log({ channels });
-	}
-
-	onMount(() => {
-		getData();
-	});
+<script lang="ts">
+	import app from "#lib/app-config.ts";
 </script>
 
-<h1>HOME</h1>
-<p>👇 will redirect you to /auth if you aren't authenticated.</p>
-<a href="/app">App</a>
+<svelte:head>
+	<title>{app.appName}</title>
+	<meta
+		name="description"
+		content="An OAuth starter for web, iOS, and Android."
+	/>
+</svelte:head>
+
+<main>
+	<h1>{app.appName}</h1>
+	<p>
+		One SvelteKit application for web, iOS, and Android, with Supabase sign-in.
+	</p>
+	<a href="/app">Open app</a>
+</main>
+
+<style>
+	main {
+		max-width: 40rem;
+		margin: 4rem auto;
+		padding: 1.5rem;
+	}
+	p {
+		margin: 1rem 0;
+	}
+</style>
