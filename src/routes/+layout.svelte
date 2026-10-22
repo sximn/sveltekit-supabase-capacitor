@@ -14,11 +14,11 @@
 
 	onMount(() => {
 		let disposed = false;
-		let disposeNativeAuth: (() => Promise<void>) | undefined;
+		let disposeOAuth: (() => Promise<void>) | undefined;
 
 		function disposeSafely(dispose: () => Promise<void>) {
 			void dispose().catch((error) => {
-				console.error("Unable to dispose native OAuth.", error);
+				console.error("Unable to dispose OAuth.", error);
 			});
 		}
 
@@ -28,15 +28,15 @@
 				if (disposed) {
 					disposeSafely(dispose);
 				} else {
-					disposeNativeAuth = dispose;
+					disposeOAuth = dispose;
 				}
 			})
 			.catch((error) => {
-				console.error("Unable to initialize native OAuth.", error);
+				console.error("Unable to initialize OAuth.", error);
 
 				if (!disposed) {
 					oauth.error =
-						"Unable to initialize native sign-in. Please restart the app.";
+						"Unable to initialize sign-in. Please reload the page or restart the app.";
 				}
 			});
 
@@ -53,8 +53,8 @@
 			disposed = true;
 			data.subscription.unsubscribe();
 
-			if (disposeNativeAuth) {
-				disposeSafely(disposeNativeAuth);
+			if (disposeOAuth) {
+				disposeSafely(disposeOAuth);
 			}
 		};
 	});

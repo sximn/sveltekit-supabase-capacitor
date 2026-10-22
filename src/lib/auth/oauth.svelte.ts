@@ -1,8 +1,10 @@
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { goto, invalidate } from "$app/navigation";
+import { goto, invalidate, replaceState } from "$app/navigation";
+import { page } from "$app/state";
 import { createNativeOAuth } from "./native-oauth.ts";
+import { initializeWebOAuth } from "./web-oauth.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getContext, setContext } from "svelte";
 import {
@@ -47,6 +49,13 @@ export class OAuth {
 
 	async initialize(): Promise<() => Promise<void>> {
 		if (!Capacitor.isNativePlatform()) {
+			const result = await initializeWebOAuth(this.auth, new URL(window.location.href));
+			this.error = result.error;
+			if (result.url && result.url.href !== window.location.href) {
+				// Preserve router state and the requested route, without replaying the
+				// callback error on reload or carrying it into the next sign-in URL.
+				goto(result.url, { state: page.state, shallow: true, replace: true });
+			}
 			return async () => {};
 		}
 
