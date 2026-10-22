@@ -21,7 +21,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       # placeholders - required at build time
       PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -39,8 +39,42 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
+
       - name: Sync Android assets and plugins
         run: npm run android:sync
+
+      - name: Set up Java for Android
+        if: runner.os == 'Linux'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            package-lock.json
+            android/**/*.gradle*
+            android/gradle.properties
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Install Android SDK packages
+        if: runner.os == 'Linux'
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Build Android debug APK
+        if: runner.os == 'Linux'
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
       - name: Sync iOS assets and plugins
         if: runner.os == 'macOS'
         run: npm run ios:sync
+      - name: Build unsigned iOS simulator app
+        if: runner.os == 'macOS'
+        run: >-
+          xcodebuild
+          -project ios/App/App.xcodeproj
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/ios-build"
+          CODE_SIGNING_ALLOWED=NO
+          build

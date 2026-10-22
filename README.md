@@ -16,7 +16,7 @@ Email and password signups, confirmation emails, magic links, and password recov
     - `.nvmrc` is provided - with nvm run `nvm install` + `nvm use`
 - Supabase project
 - For iOS:
-    - macOS, Xcode, and the Xcode command-line tools
+    - macOS, Xcode **26+**, and the Xcode command-line tools
 - For Android:
     - Android Studio, Java **21**, Android SDK **36**, and Android SDK Build-Tools **36.0.0**
 
@@ -120,3 +120,5 @@ npm run check
 npm test
 npm run build
 ```
+
+CI verifies setup, tests, type checking, frontend builds, and native sync on Linux, macOS, and Windows (iOS sync on macOS). It also compiles an Android debug APK on Linux with Java 21 and SDK 36, and an unsigned iOS simulator app on macOS. Both builds use the renamed template and placeholder Supabase settings.
