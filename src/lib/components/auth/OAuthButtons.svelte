@@ -34,7 +34,6 @@
 </script>
 
 {#if oauth.enabledProviders.length}
-	<div class="divider"><span>or</span></div>
 	<div class="oauth-buttons">
 		{#each oauth.enabledProviders as provider (provider.id)}
 			<button
@@ -47,26 +46,13 @@
 			</button>
 		{/each}
 	</div>
+{:else}
+	<p role="status">No sign-in providers are available.</p>
 {/if}
 
 <style>
 	.oauth-buttons {
 		display: grid;
 		gap: 0.75rem;
-	}
-	.divider {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin: 1.25rem 0;
-		color: #71717a;
-		font-size: 0.875rem;
-	}
-	.divider::before,
-	.divider::after {
-		content: "";
-		flex: 1;
-		height: 1px;
-		background: #e4e4e7;
 	}
 </style>
