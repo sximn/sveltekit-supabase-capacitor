@@ -103,9 +103,15 @@ npm run android:open
 
 ## Application intent
 
-The application uses `adapter-static` and prerenders all its routes. This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data.
+The application uses `adapter-static` to build a client-rendered SPA. Every route runs in the browser or WebView, using `build/index.html` as the entry point. Routes such as `/app/items/[id]` can load data for IDs that only exist at runtime.
 
-Static output lets the same frontend run on the web and inside Capacitor.
+Deploy the contents of `build/` to a static web host. Configure the host to serve existing files first, then rewrite unmatched page requests to `/index.html` with a **200** status, preserving the requested URL. This fallback is required for direct visits, reloads, and OAuth returns to app routes. `npm run preview` supports it locally.
+
+Capacitor uses the same build and serves `index.html` for app routes. The existing sync and run commands copy the build directly into each native project.
+
+All pages, including the homepage, require JavaScript to render. This keeps the template simple for app development - an SEO-focused public site may need a separate rendering strategy.
+
+This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data. The `(authenticated)` layout controls the sign-in UI, it does not authorize database access.
 
 ## Checks and CI
 
