@@ -7,11 +7,30 @@
 	import { page } from "$app/state";
 	import { provideOAuth } from "#lib/auth/oauth.svelte.ts";
 	import AuthLoading from "#lib/components/auth/AuthLoading.svelte";
+	import Spinner from "#lib/components/auth/Spinner.svelte";
 
 	let { children, data }: LayoutProps = $props();
 	const { supabase, authClaims } = $derived(data);
 
 	const oauth = provideOAuth(untrack(() => supabase.auth));
+	let retryingSession = $state(false);
+
+	async function retrySession() {
+		if (retryingSession || oauth.busy) {
+			return;
+		}
+
+		retryingSession = true;
+
+		try {
+			await invalidate("supabase:auth");
+		} catch (error) {
+			// keep the last session error visible if navigation itself fails
+			console.error("Unable to reload session data.", error);
+		} finally {
+			retryingSession = false;
+		}
+	}
 
 	onMount(() => {
 		let disposed = false;
@@ -76,10 +95,39 @@
 {#if oauth.phase === "initializing" || oauth.phase === "completing"}
 	<AuthLoading message={oauth.phase === "completing" ? "Finishing sign-in..." : "Checking session..."} />
 {:else}
+	{#if data.sessionError}
+		<section class="session-error">
+			<p role="alert">Unable to load your session: {data.sessionError}</p>
+			<button
+				type="button"
+				onclick={retrySession}
+				disabled={retryingSession || oauth.busy}
+				aria-busy={retryingSession}
+			>
+				{#if retryingSession}<Spinner />{/if}
+				{retryingSession ? "Retrying..." : "Retry"}
+			</button>
+		</section>
+	{/if}
 	{@render children()}
 {/if}
 
 <style>
+	.session-error {
+		padding: 1rem;
+	}
+
+	.session-error p {
+		margin: 0 0 0.75rem;
+		color: #b91c1c;
+	}
+
+	.session-error button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
 	.oauth-error {
 		margin: 0;
 		padding: 1rem;

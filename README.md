@@ -115,6 +115,8 @@ This setup does not require a SvelteKit server. Use Supabase Edge Functions or a
 
 The shared auth context (`getOAuth()`) exposes reactive `phase`, `pendingProvider`, `busy`, and `error` values for custom UI. The included buttons show a spinner during sign-in and logout. Sign-in stays pending until the web page leaves, or the native callback finishes exchanging its code and updating the route. Logout waits for refreshed session data. Failures and native browser cancellation release the pending state so users can retry.
 
+Session-loading failures are returned as `data.sessionError` by the root layout and shown with a Retry action. Retry reloads `supabase:auth` without starting a new sign-in. Protected routes wait for a successful session check before showing app content or sign-in; public pages remain available.
+
 On web redirects, the root layout waits for Supabase to resolve the session before rendering the app; the HTML shell shows a loading message during that wait. Native callbacks show a loading screen while completing sign-in. Neither callback path depends on receiving an auth event before displaying the resolved session.
 
 ## Checks and CI

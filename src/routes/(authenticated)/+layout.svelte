@@ -22,7 +22,9 @@
 	);
 </script>
 
-{#if data.userId || signingOut}
+{#if data.sessionError}
+	<!-- root layout shows the error and retry action while session state is unknown -->
+{:else if data.userId || signingOut}
 	<div class="auth-welcome">
 		<p>Signed in</p>
 		<button class="sign-out-btn" disabled={oauth.busy} aria-busy={signingOut} onclick={signOut}>
