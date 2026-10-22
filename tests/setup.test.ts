@@ -151,12 +151,19 @@ test('CLI works from another directory and prints the configured redirect withou
 	await writeFile(join(dir, '.env'), 'PRIVATE_SENTINEL=do-not-print\n');
 	const script = join(dir, 'scripts/setup.ts');
 	const { stdout } = await exec(process.execPath, [script, '--yes', '--app-id', identity.appId, '--app-name', identity.appName], { cwd: tmpdir() });
-	assert.ok(stdout.includes(`${identity.appId}://auth/callback`));
+
+	assert.ok(
+		stdout.includes(`${identity.appId}://auth/callback`),
+		`Unexpected CLI stdout: ${JSON.stringify(stdout)}`,
+	);
+
 	assert.ok(stdout.includes('Preserved existing .env'));
 	assert.ok(!stdout.includes('do-not-print'));
 	assert.equal(JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')).name, 'new-app');
+
 	for (const args of [['--unknown'], ['--app-id'], []]) {
 		await assert.rejects(exec(process.execPath, [script, ...args]), (error: { code?: number }) => error.code === 1);
 	}
+
 	assert.match((await exec(process.execPath, [script, '--help'])).stdout, /Usage:/);
 });
