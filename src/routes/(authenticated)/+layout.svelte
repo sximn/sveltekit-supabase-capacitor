@@ -49,9 +49,38 @@
 		justify-content: space-between;
 		align-items: center;
 		border-bottom: 1px solid black;
+		line-height: 1.5;
+	}
+
+	.auth-welcome p {
+		margin: 0;
 	}
 
 	.sign-out-btn {
 		width: fit-content;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.875rem;
+		border: 1px solid #d4d4d8;
+		border-radius: 0.375rem;
+		background: #18181b;
+		color: #fff;
+		font: inherit;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.sign-out-btn:hover:not(:disabled) {
+		background: #3f3f46;
+	}
+
+	.sign-out-btn:focus-visible {
+		outline: 2px solid #18181b;
+		outline-offset: 3px;
+	}
+
+	.sign-out-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 </style>

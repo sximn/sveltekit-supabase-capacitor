@@ -30,6 +30,7 @@
 		align-items: center;
 		padding: 1rem;
 		font-family: system-ui, sans-serif;
+		line-height: 1.5;
 	}
 
 	.auth-container {
@@ -41,6 +42,10 @@
 		background: #fff;
 		color: #18181b;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
+	}
+
+	.auth-container h1 {
+		margin: 0;
 	}
 
 	.auth-container p {

@@ -10,5 +10,11 @@
 <style>
 	main {
 		padding: 1.5rem;
+		line-height: 1.5;
+	}
+
+	h1,
+	p {
+		margin: 0;
 	}
 </style>

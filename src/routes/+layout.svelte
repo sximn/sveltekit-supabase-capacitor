@@ -76,6 +76,7 @@
 
 <style>
 	.oauth-error {
+		margin: 0;
 		padding: 1rem;
 		color: #b91c1c;
 	}
