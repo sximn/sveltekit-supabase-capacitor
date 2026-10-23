@@ -113,6 +113,8 @@ All pages, including the homepage, require JavaScript to render. This keeps the 
 
 This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data. The `(authenticated)` layout controls the sign-in UI, it does not authorize database access.
 
+OAuth uses PKCE on web, iOS, and Android. Supabase automatically exchanges web callback codes. The native auth adapter exchanges codes delivered through the Capacitor App plugin. Complete web sign-in in the same browser and origin where it started so the SDK can read its stored verifier.
+
 The shared auth context (`getOAuth()`) exposes reactive `phase`, `pendingProvider`, `busy`, and `error` values for custom UI. The included buttons show a spinner during sign-in and logout. Sign-in stays pending until the web page leaves, or the native callback finishes exchanging its code and updating the route. Logout waits for refreshed session data. Failures and native browser cancellation release the pending state so users can retry.
 
 Session-loading failures are returned as `data.sessionError` by the root layout and shown with a Retry action. Retry reloads `supabase:auth` without starting a new sign-in. Protected routes wait for a successful session check before showing app content or sign-in; public pages remain available.

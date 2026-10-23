@@ -1,33 +1,22 @@
 <script lang="ts">
 	import { getOAuth } from "#lib/auth/oauth.svelte.ts";
-	import type { OAuthPending, OAuthProvider } from "#lib/auth/providers.ts";
+	import type { OAuthProvider } from "#lib/auth/providers.ts";
 	import Spinner from "./Spinner.svelte";
 
 	let {
 		redirectTo = "/app",
 		authCallbackTo = redirectTo,
-		pending = $bindable<OAuthPending>(null),
-		onstart,
 	}: {
 		redirectTo?: string;
 		authCallbackTo?: string;
-		pending?: OAuthPending;
-		onstart?: () => void;
 	} = $props();
 
 	const oauth = getOAuth();
 
-	$effect(() => {
-		pending = oauth.pendingProvider;
-	});
-
 	async function signIn(provider: OAuthProvider) {
-		if (pending || oauth.busy) {
+		if (oauth.busy) {
 			return;
 		}
-
-		onstart?.();
-		pending = provider;
 
 		try {
 			await oauth.signIn(provider, { returnPath: redirectTo, authCallbackTo });
@@ -43,11 +32,11 @@
 			<button
 				type="button"
 				onclick={() => signIn(provider.id)}
-				disabled={pending !== null || oauth.busy}
-				aria-busy={pending === provider.id}
+				disabled={oauth.busy}
+				aria-busy={oauth.pendingProvider === provider.id}
 			>
-				{#if pending === provider.id}<Spinner />{/if}
-				{pending === provider.id
+				{#if oauth.pendingProvider === provider.id}<Spinner />{/if}
+				{oauth.pendingProvider === provider.id
 					? "Redirecting..."
 					: `Continue with ${provider.label}`}
 			</button>

@@ -4,14 +4,17 @@ export async function initializeWebOAuth(
 	auth: Pick<SupabaseClient["auth"], "initialize">,
 	url: URL,
 ) {
-	// The SDK already processed the redirect. Read its cached result, including
-	// failures that don't emit a signed-in auth event.
+	// the SDK already processed the redirect
+	// read its cached result, including failures that don't emit a signed-in auth event
 	const { error } = await auth.initialize();
 	if (!error) {
 		return { error: null, url: null };
 	}
 
 	const cleanUrl = new URL(url);
+	// failed exchanges leave the code in the URL -> Do not carry it into a retry
+	cleanUrl.searchParams.delete("code");
+	cleanUrl.searchParams.delete("sb_flow_id");
 	const fragment = new URLSearchParams(cleanUrl.hash.slice(1));
 
 	let changedFragment = false;

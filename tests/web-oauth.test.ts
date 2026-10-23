@@ -3,10 +3,24 @@ import { test, type TestContext } from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import { initializeWebOAuth } from "../src/lib/auth/web-oauth.ts";
 
-function browserClient(t: TestContext, href: string, signedIn = false) {
+function browserClient(
+	t: TestContext,
+	href: string,
+	exchange?: (body: Record<string, string>) => Response,
+) {
 	const location = new URL(href);
 	for (const [name, value] of Object.entries({
-		window: { location, addEventListener() {}, removeEventListener() {} },
+		window: {
+			location,
+			addEventListener() {},
+			removeEventListener() {},
+			history: {
+				state: {},
+				replaceState(_state: unknown, _title: string, url: string) {
+					location.href = url;
+				},
+			},
+		},
 		document: { visibilityState: "visible" },
 	})) {
 		const previous = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -22,21 +36,22 @@ function browserClient(t: TestContext, href: string, signedIn = false) {
 		"sb_publishable_web_test",
 		{
 			auth: {
-				flowType: "implicit",
+				flowType: "pkce",
 				detectSessionInUrl: true,
 				persistSession: false,
 				autoRefreshToken: false,
 				storageKey: `web-oauth-test:${t.name}`,
+				// Stage a sign-in and callback in one client, letting the SDK create
+				// its own verifier before initialization processes the returned code.
+				skipAutoInitialize: exchange !== undefined,
 			},
 			global: {
-				async fetch() {
-					assert.ok(signedIn, "denied callbacks must not make auth requests");
-					return new Response(
-						JSON.stringify({ id: "test-user", aud: "authenticated" }),
-						{
-							headers: { "Content-Type": "application/json" },
-						},
+				async fetch(_url, init) {
+					assert.ok(
+						exchange,
+						"only a PKCE code exchange should make an auth request",
 					);
+					return exchange(JSON.parse(String(init?.body)));
 				},
 			},
 		},
@@ -61,7 +76,7 @@ test("a fragment denial exposes the SDK error and preserves the return route and
 
 test("query denial parameters are removed so a retry cannot inherit the failed callback", async (t) => {
 	const href =
-		"https://app.example/app?tab=profile&error=access_denied&error_description=Try%20again&error_code=denied#settings";
+		"https://app.example/app?tab=profile&code=failed-code&sb_flow_id=failed-flow&error=access_denied&error_description=Try%20again&error_code=denied#settings";
 	const { auth } = browserClient(t, href);
 	const result = await initializeWebOAuth(auth, new URL(href));
 	assert.equal(result.error, "Try again");
@@ -101,7 +116,8 @@ test("a denial without a description still exposes the SDK fallback message", as
 });
 
 test("ordinary visits leave application query parameters and anchors alone", async (t) => {
-	const href = "https://app.example/app?tab=profile#settings";
+	const href =
+		"https://app.example/app?tab=profile&code=application-code#settings";
 	const { auth, location } = browserClient(t, href);
 	assert.deepEqual(await initializeWebOAuth(auth, new URL(href)), {
 		error: null,
@@ -110,14 +126,65 @@ test("ordinary visits leave application query parameters and anchors alone", asy
 	assert.equal(location.href, href);
 });
 
-test("a successful callback remains owned by the SDK and cannot restore cleared tokens", async (t) => {
-	const href =
-		"https://app.example/app?tab=profile#access_token=test-token&refresh_token=test-refresh&expires_in=3600&token_type=bearer";
-	const { auth, location } = browserClient(t, href, true);
+test("the SDK exchanges a web PKCE code once and cleans a successful callback", async (t) => {
+	const href = "https://app.example/app/items/123?tab=details#settings";
+	let exchanges = 0;
+	const { auth, location } = browserClient(t, href, (body) => {
+		exchanges++;
+		assert.equal(body.auth_code, "returned-code");
+		assert.ok(body.code_verifier);
+		return new Response(
+			JSON.stringify({
+				access_token: "test-token",
+				refresh_token: "test-refresh",
+				expires_in: 3600,
+				token_type: "bearer",
+				user: { id: "test-user", aud: "authenticated" },
+			}),
+			{ headers: { "Content-Type": "application/json" } },
+		);
+	});
+	const started = await auth.signInWithOAuth({
+		provider: "google",
+		options: { redirectTo: href, skipBrowserRedirect: true },
+	});
+	assert.equal(started.error, null);
+	assert.ok(new URL(started.data.url!).searchParams.get("code_challenge"));
+	location.searchParams.set("code", "returned-code");
+	// Emulate automatic initialization on return, before the layout/helper runs.
+	assert.equal((await auth.initialize()).error, null);
+	assert.equal((await auth.getSession()).data.session?.user.id, "test-user");
+	assert.equal(location.href, href);
 	assert.deepEqual(await initializeWebOAuth(auth, new URL(href)), {
 		error: null,
 		url: null,
 	});
-	assert.equal(location.href, "https://app.example/app?tab=profile");
-	assert.equal((await auth.getSession()).data.session?.user.id, "test-user");
+	assert.equal(exchanges, 1);
+});
+
+test("a rejected PKCE code exposes the cached error and is removed before retry", async (t) => {
+	const href = "https://app.example/app/items/123?tab=details#settings";
+	const { auth, location } = browserClient(t, href, (body) => {
+		assert.equal(body.auth_code, "expired-code");
+		return new Response(
+			JSON.stringify({ msg: "Code expired", code: "flow_state_expired" }),
+			{ status: 400, headers: { "Content-Type": "application/json" } },
+		);
+	});
+	await auth.signInWithOAuth({
+		provider: "google",
+		options: { redirectTo: href, skipBrowserRedirect: true },
+	});
+	location.searchParams.set("code", "expired-code");
+	assert.equal((await auth.initialize()).error?.message, "Code expired");
+	assert.equal((await auth.getSession()).data.session, null);
+	const result = await initializeWebOAuth(auth, new URL(location.href));
+	assert.equal(result.error, "Code expired");
+	assert.equal(result.url?.href, href);
+	const retry = await auth.signInWithOAuth({
+		provider: "google",
+		options: { redirectTo: result.url!.href, skipBrowserRedirect: true },
+	});
+	assert.equal(retry.error, null);
+	assert.equal(new URL(retry.data.url!).searchParams.get("redirect_to"), href);
 });
