@@ -23,6 +23,10 @@
 		max-width: 40rem;
 		margin: 4rem auto;
 		padding: 1.5rem;
+		line-height: 1.5;
+	}
+	h1 {
+		margin: 0;
 	}
 	p {
 		margin: 1rem 0;

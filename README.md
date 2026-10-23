@@ -16,7 +16,7 @@ Email and password signups, confirmation emails, magic links, and password recov
     - `.nvmrc` is provided - with nvm run `nvm install` + `nvm use`
 - Supabase project
 - For iOS:
-    - macOS, Xcode, and the Xcode command-line tools
+    - macOS, Xcode **26+**, and the Xcode command-line tools
 - For Android:
     - Android Studio, Java **21**, Android SDK **36**, and Android SDK Build-Tools **36.0.0**
 
@@ -103,9 +103,23 @@ npm run android:open
 
 ## Application intent
 
-The application uses `adapter-static` and prerenders all its routes. This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data.
+The application uses `adapter-static` to build a client-rendered SPA. Every route runs in the browser or WebView, using `build/index.html` as the entry point. Routes such as `/app/items/[id]` can load data for IDs that only exist at runtime.
 
-Static output lets the same frontend run on the web and inside Capacitor.
+Deploy the contents of `build/` to a static web host. Configure the host to serve existing files first, then rewrite unmatched page requests to `/index.html` with a **200** status, preserving the requested URL. This fallback is required for direct visits, reloads, and OAuth returns to app routes. `npm run preview` supports it locally.
+
+Capacitor uses the same build and serves `index.html` for app routes. The existing sync and run commands copy the build directly into each native project.
+
+All pages, including the homepage, require JavaScript to render. This keeps the template simple for app development - an SEO-focused public site may need a separate rendering strategy.
+
+This setup does not require a SvelteKit server. Use Supabase Edge Functions or another backend for secrets and privileged operations. Use row-level security (RLS) policies to authorize access to data. The `(authenticated)` layout controls the sign-in UI, it does not authorize database access.
+
+OAuth uses PKCE on web, iOS, and Android. Supabase automatically exchanges web callback codes. The native auth adapter exchanges codes delivered through the Capacitor App plugin. Complete web sign-in in the same browser and origin where it started so the SDK can read its stored verifier.
+
+The shared auth context (`getOAuth()`) exposes reactive `phase`, `pendingProvider`, `busy`, and `error` values for custom UI. The included buttons show a spinner during sign-in and logout. Sign-in stays pending until the web page leaves, or the native callback finishes exchanging its code and updating the route. Logout waits for refreshed session data. Failures and native browser cancellation release the pending state so users can retry.
+
+Session-loading failures are returned as `data.sessionError` by the root layout and shown with a Retry action. Retry reloads `supabase:auth` without starting a new sign-in. Protected routes wait for a successful session check before showing app content or sign-in; public pages remain available.
+
+On every full page load, including web OAuth returns and native cold starts, the HTML shell shows a loading message while JavaScript starts and the root layout loads the session. The root layout removes this status on mount and shows the existing auth loading UI while initialization or a native callback is still in progress.
 
 ## Checks and CI
 
@@ -114,3 +128,5 @@ npm run check
 npm test
 npm run build
 ```
+
+CI verifies setup, tests, type checking, frontend builds, and native sync on Linux, macOS, and Windows (iOS sync on macOS). It also compiles an Android debug APK on Linux with Java 21 and SDK 36, and an unsigned iOS simulator app on macOS. Both builds use the renamed template and placeholder Supabase settings.

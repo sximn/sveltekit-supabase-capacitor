@@ -11,8 +11,7 @@ function createBrowserClient() {
 		PUBLIC_SUPABASE_PUBLISHABLE_KEY,
 		{
 			auth: {
-				// the native callback is delivered through the App plugin, not location.href
-				flowType: Capacitor.isNativePlatform() ? "pkce" : "implicit",
+				flowType: "pkce",
 				detectSessionInUrl: !Capacitor.isNativePlatform(),
 				persistSession: true,
 				autoRefreshToken: true,
