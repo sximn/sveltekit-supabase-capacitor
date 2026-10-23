@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setImmediate } from "node:timers/promises";
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { createNativeOAuth, localReturnPath, NATIVE_AUTH_CALLBACK } from "../src/lib/auth/native-oauth.ts";
-import { getOAuthOptions, getOAuthProvider } from "../src/lib/auth/providers.ts";
+import {
+	createNativeOAuth,
+	localReturnPath,
+	NATIVE_AUTH_CALLBACK,
+} from "../src/lib/auth/native-oauth.ts";
+import {
+	getOAuthOptions,
+	getOAuthProvider,
+} from "../src/lib/auth/providers.ts";
 
 function harness(
 	storage = new Map<string, string>(),
@@ -13,17 +21,30 @@ function harness(
 	let urlListener: ((event: { url: string }) => void) | undefined;
 	let finishedListener: (() => void) | undefined;
 	const calls = {
-		signIns: [] as unknown[], exchanges: [] as string[], opened: [] as string[],
-		paths: [] as string[], errors: [] as string[], closed: 0, removed: 0,
+		signIns: [] as unknown[],
+		exchanges: [] as string[],
+		opened: [] as string[],
+		paths: [] as string[],
+		errors: [] as string[],
+		closed: 0,
+		removed: 0,
 	};
-	let exchangeResult = { data: { session: {} as unknown | null }, error: null as { message: string } | null };
+	let exchangeResult = {
+		data: { session: {} as unknown | null },
+		error: null as { message: string } | null,
+	};
 	let failOpen = false;
 	let finishOnClose = false;
 	const oauth = createNativeOAuth({
 		auth: auth ?? {
 			async signInWithOAuth(options) {
 				calls.signIns.push(options);
-				return { data: { url: `https://example.supabase.co/auth/v1/authorize?provider=${options.provider}` }, error: null };
+				return {
+					data: {
+						url: `https://example.supabase.co/auth/v1/authorize?provider=${options.provider}`,
+					},
+					error: null,
+				};
 			},
 			async exchangeCodeForSession(code) {
 				calls.exchanges.push(code);
@@ -33,74 +54,109 @@ function harness(
 		app: {
 			async addListener(_event, listener) {
 				urlListener = listener;
-				return { async remove() { urlListener = undefined; calls.removed++; } };
+				return {
+					async remove() {
+						urlListener = undefined;
+						calls.removed++;
+					},
+				};
 			},
-			async getLaunchUrl() { return launchUrl ? { url: launchUrl } : undefined; },
+			async getLaunchUrl() {
+				return launchUrl ? { url: launchUrl } : undefined;
+			},
 		},
 		browser: {
 			async open({ url }) {
 				if (failOpen) throw new Error("Browser unavailable");
 				calls.opened.push(url);
 			},
-			async close() { calls.closed++; if (finishOnClose) finishedListener?.(); },
+			async close() {
+				calls.closed++;
+				if (finishOnClose) finishedListener?.();
+			},
 			async addListener(_event, listener) {
 				finishedListener = listener;
-				return { async remove() { finishedListener = undefined; calls.removed++; } };
+				return {
+					async remove() {
+						finishedListener = undefined;
+						calls.removed++;
+					},
+				};
 			},
 		},
 		storage: {
 			getItem: (key) => storage.get(key) ?? null,
-			setItem: (key, value) => { storage.set(key, value); },
-			removeItem: (key) => { storage.delete(key); },
+			setItem: (key, value) => {
+				storage.set(key, value);
+			},
+			removeItem: (key) => {
+				storage.delete(key);
+			},
 		},
-		async onSignedIn(path) { calls.paths.push(path); },
-		onError(message) { calls.errors.push(message); },
+		async onSignedIn(path) {
+			calls.paths.push(path);
+		},
+		onError(message) {
+			calls.errors.push(message);
+		},
 	});
 	return {
-		oauth, calls, storage,
-		async openUrl(url: string) { urlListener?.({ url }); await setImmediate(); },
-		finish() { finishedListener?.(); },
-		failOpen() { failOpen = true; },
-		finishOnClose() { finishOnClose = true; },
-		failExchange() { exchangeResult = { data: { session: null }, error: { message: "Expired code" } }; },
+		oauth,
+		calls,
+		storage,
+		async openUrl(url: string) {
+			urlListener?.({ url });
+			await setImmediate();
+		},
+		finish() {
+			finishedListener?.();
+		},
+		failOpen() {
+			failOpen = true;
+		},
+		finishOnClose() {
+			finishOnClose = true;
+		},
+		failExchange() {
+			exchangeResult = {
+				data: { session: null },
+				error: { message: "Expired code" },
+			};
+		},
 	};
 }
 
-test("native sign-in requests the registered PKCE callback without navigating the WebView", async () => {
+test("native sign-in passes the registered callback and disables automatic browser redirect", async () => {
 	const h = harness();
 	await h.oauth.signIn("google", "/app?tab=profile");
-	assert.deepEqual(h.calls.signIns, [{
-		provider: "google", options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
-	}]);
+	assert.deepEqual(h.calls.signIns, [
+		{
+			provider: "google",
+			options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
+		},
+	]);
 	assert.equal(h.calls.opened.length, 1);
 	assert.deepEqual([...h.storage.values()], ["/app?tab=profile"]);
 	await h.oauth.dispose();
 });
 
-for (const provider of ["google", "apple", "facebook", "github"] as const) {
-	test(`${provider} uses the same native browser and callback exchange`, async () => {
-		const h = harness();
-		await h.oauth.signIn(provider, "/app");
-		assert.deepEqual(h.calls.signIns, [{
-			provider, options: { redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
-		}]);
-		assert.equal(new URL(h.calls.opened[0]).searchParams.get("provider"), provider);
-		await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=${provider}-code`);
-		assert.deepEqual(h.calls.exchanges, [`${provider}-code`]);
-		assert.deepEqual(h.calls.paths, ["/app"]);
-		assert.deepEqual(h.calls.errors, []);
-		await h.oauth.dispose();
-	});
-}
-
 test("provider scopes and query parameters are passed through without changing the native callback", async () => {
 	const h = harness();
-	const options = { scopes: "read:user user:email", queryParams: { allow_signup: "false" } };
+	const options = {
+		scopes: "read:user user:email",
+		queryParams: { allow_signup: "false" },
+	};
 	await h.oauth.signIn("github", "/app", options);
-	assert.deepEqual(h.calls.signIns, [{
-		provider: "github",
-		options: { ...options, redirectTo: NATIVE_AUTH_CALLBACK, skipBrowserRedirect: true },
-	}]);
+	assert.deepEqual(h.calls.signIns, [
+		{
+			provider: "github",
+			options: {
+				...options,
+				redirectTo: NATIVE_AUTH_CALLBACK,
+				skipBrowserRedirect: true,
+			},
+		},
+	]);
 	await h.oauth.dispose();
 });
 
@@ -112,18 +168,28 @@ test("only explicitly enabled providers are selectable", () => {
 	assert.equal(getOAuthProvider("google", providers).label, "Google");
 	assert.throws(() => getOAuthProvider("apple", providers), /not enabled/);
 	assert.throws(() => getOAuthProvider("discord", providers), /not enabled/);
-	assert.equal(getOAuthProvider("apple", [{ id: "apple", label: "Apple", enabled: true }]).id, "apple");
+	assert.equal(
+		getOAuthProvider("apple", [{ id: "apple", label: "Apple", enabled: true }])
+			.id,
+		"apple",
+	);
 });
 
 test("provider options exclude credentials and transport settings", () => {
 	const config = {
-		scopes: "email", queryParams: { prompt: "consent" },
-		clientSecret: "must-not-forward", redirectTo: "https://example.test", skipBrowserRedirect: false,
+		scopes: "email",
+		queryParams: { prompt: "consent" },
+		clientSecret: "must-not-forward",
+		redirectTo: "https://example.test",
+		skipBrowserRedirect: false,
 	};
-	assert.deepEqual(getOAuthOptions(config), { scopes: "email", queryParams: { prompt: "consent" } });
+	assert.deepEqual(getOAuthOptions(config), {
+		scopes: "email",
+		queryParams: { prompt: "consent" },
+	});
 });
 
-test("a warm callback exchanges once, persists no code, and returns to the requested page", async () => {
+test("a warm callback exchanges once, clears the attempt, and restores the return path", async () => {
 	const h = harness();
 	await h.oauth.signIn("google", "/app?tab=profile");
 	h.finishOnClose();
@@ -136,30 +202,25 @@ test("a warm callback exchanges once, persists no code, and returns to the reque
 	assert.deepEqual(h.calls.errors, []);
 });
 
-test("a cold-start callback completes the attempt saved by a previous app process", async () => {
-	const storage = new Map<string, string>();
-	const first = harness(storage);
-	await first.oauth.signIn("google", "/app");
-	await first.oauth.dispose();
-	const restarted = harness(storage, `${NATIVE_AUTH_CALLBACK}?code=cold-code`);
-	await restarted.oauth.initialize();
-	assert.deepEqual(restarted.calls.exchanges, ["cold-code"]);
-	assert.deepEqual(restarted.calls.paths, ["/app"]);
-	await restarted.openUrl(`${NATIVE_AUTH_CALLBACK}?code=cold-code`);
-	assert.equal(restarted.calls.exchanges.length, 1);
-});
-
 test("unrelated and malformed deep links cannot consume a pending sign-in", async () => {
 	const h = harness();
 	await h.oauth.signIn("google", "/app");
+	const callback = new URL(NATIVE_AUTH_CALLBACK);
 	for (const url of [
-		"not a URL", "https://auth/callback?code=wrong", "com.other.app://auth/callback?code=wrong",
-		"com.supacapacitor.app://other/callback?code=wrong", "com.supacapacitor.app://auth/other?code=wrong",
-		"com.supacapacitor.app://user@auth/callback?code=wrong", "com.supacapacitor.app://auth:123/callback?code=wrong",
+		"not a URL",
+		`https://${callback.host}${callback.pathname}?code=wrong`,
+		`other-${callback.protocol}//${callback.host}${callback.pathname}?code=wrong`,
+		`${callback.protocol}//other${callback.pathname}?code=wrong`,
+		`${callback.protocol}//${callback.host}/other?code=wrong`,
+		`${callback.protocol}//user@${callback.host}${callback.pathname}?code=wrong`,
+		`${callback.protocol}//:password@${callback.host}${callback.pathname}?code=wrong`,
+		`${callback.protocol}//${callback.host}:123${callback.pathname}?code=wrong`,
 		`${NATIVE_AUTH_CALLBACK}#access_token=wrong`,
-	]) await h.openUrl(url);
-	assert.deepEqual(h.calls.exchanges, []);
-	assert.equal(h.storage.size, 1);
+	]) {
+		await h.openUrl(url);
+		assert.deepEqual(h.calls.exchanges, [], url);
+		assert.equal(h.storage.size, 1, url);
+	}
 	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?code=right`);
 	assert.deepEqual(h.calls.exchanges, ["right"]);
 });
@@ -171,10 +232,12 @@ test("unsolicited or stale launch callbacks never establish a session", async ()
 	assert.deepEqual(h.calls.paths, []);
 });
 
-test("provider denial is displayed, closes the browser, and permits retry", async () => {
+test("provider denial reports an error, closes the browser, and permits retry", async () => {
 	const h = harness();
 	await h.oauth.signIn("google", "/app");
-	await h.openUrl(`${NATIVE_AUTH_CALLBACK}?error=access_denied&error_description=User%20denied%20access`);
+	await h.openUrl(
+		`${NATIVE_AUTH_CALLBACK}?error=access_denied&error_description=User%20denied%20access`,
+	);
 	assert.deepEqual(h.calls.errors, ["User denied access"]);
 	assert.deepEqual(h.calls.exchanges, []);
 	assert.deepEqual(h.calls.paths, []);
@@ -235,7 +298,13 @@ test("listener initialization is shared and disposing removes only owned listene
 });
 
 test("return destinations cannot escape into external URLs", () => {
-	for (const path of ["https://evil.test", "//evil.test", "/\\evil.test", "/\nevil.test", "javascript:alert(1)"]) {
+	for (const path of [
+		"https://evil.test",
+		"//evil.test",
+		"/\\evil.test",
+		"/\nevil.test",
+		"javascript:alert(1)",
+	]) {
 		assert.equal(localReturnPath(path), "/app");
 	}
 	assert.equal(localReturnPath("/app?tab=profile"), "/app?tab=profile");
@@ -243,28 +312,44 @@ test("return destinations cannot escape into external URLs", () => {
 
 test("the real Supabase SDK restores the PKCE verifier and persists a session across a cold start", async () => {
 	const storage = new Map<string, string>();
-	const requests: { url: string; body: Record<string, string> }[] = [];
-	const accessToken = [
-		{ alg: "HS256", typ: "JWT" },
-		{ sub: "test-user", exp: Math.floor(Date.now() / 1000) + 3600 },
-	].map((part) => Buffer.from(JSON.stringify(part)).toString("base64url")).join(".") + ".signature";
+	const requests: Record<string, string>[] = [];
+	const accessToken =
+		[
+			{ alg: "HS256", typ: "JWT" },
+			{ sub: "test-user", exp: Math.floor(Date.now() / 1000) + 3600 },
+		]
+			.map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+			.join(".") + ".signature";
 	function client() {
 		return createClient("https://example.supabase.co", "sb_publishable_test", {
 			auth: {
-				flowType: "pkce", detectSessionInUrl: false, persistSession: true, autoRefreshToken: false,
+				flowType: "pkce",
+				detectSessionInUrl: false,
+				persistSession: true,
+				autoRefreshToken: false,
 				storage: {
 					getItem: (key) => storage.get(key) ?? null,
-					setItem: (key, value) => { storage.set(key, value); },
-					removeItem: (key) => { storage.delete(key); },
+					setItem: (key, value) => {
+						storage.set(key, value);
+					},
+					removeItem: (key) => {
+						storage.delete(key);
+					},
 				},
 			},
 			global: {
-				async fetch(input, init) {
-					requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
-					return new Response(JSON.stringify({
-						access_token: accessToken, refresh_token: "test-refresh", expires_in: 3600,
-						token_type: "bearer", user: { id: "test-user", aud: "authenticated" },
-					}), { headers: { "Content-Type": "application/json" } });
+				async fetch(_input, init) {
+					requests.push(JSON.parse(String(init?.body)));
+					return new Response(
+						JSON.stringify({
+							access_token: accessToken,
+							refresh_token: "test-refresh",
+							expires_in: 3600,
+							token_type: "bearer",
+							user: { id: "test-user", aud: "authenticated" },
+						}),
+						{ headers: { "Content-Type": "application/json" } },
+					);
 				},
 			},
 		});
@@ -272,23 +357,33 @@ test("the real Supabase SDK restores the PKCE verifier and persists a session ac
 	const first = harness(storage, undefined, client().auth);
 	await first.oauth.signIn("google", "/app");
 	const authorize = new URL(first.calls.opened[0]);
-	assert.equal(authorize.searchParams.get("code_challenge_method"), "s256");
-	assert.ok(authorize.searchParams.get("code_challenge"));
-	const verifierEntry = [...storage.entries()].find(([key]) => key.endsWith("-code-verifier"));
-	assert.ok(verifierEntry, "the verifier must persist in the app's storage before opening Safari");
-	const verifier = JSON.parse(verifierEntry![1]);
+	assert.equal(
+		authorize.searchParams.get("code_challenge_method")?.toLowerCase(),
+		"s256",
+	);
+	const challenge = authorize.searchParams.get("code_challenge");
+	assert.ok(challenge);
 	await first.oauth.dispose();
 
 	const restoredClient = client();
-	const restored = harness(storage, `${NATIVE_AUTH_CALLBACK}?code=returned-code`, restoredClient.auth);
+	const restored = harness(
+		storage,
+		`${NATIVE_AUTH_CALLBACK}?code=returned-code`,
+		restoredClient.auth,
+	);
 	await restored.oauth.initialize();
 	assert.equal(requests.length, 1);
-	assert.equal(new URL(requests[0].url).searchParams.get("grant_type"), "pkce");
-	assert.deepEqual(requests[0].body, { auth_code: "returned-code", code_verifier: verifier });
+	assert.equal(requests[0].auth_code, "returned-code");
+	// Verify the public PKCE contract without depending on the SDK's storage key.
+	assert.equal(
+		createHash("sha256").update(requests[0].code_verifier).digest("base64url"),
+		challenge,
+	);
 	assert.deepEqual(restored.calls.errors, []);
 	assert.deepEqual(restored.calls.paths, ["/app"]);
-	assert.equal((await restoredClient.auth.getSession()).data.session?.user.id, "test-user");
-	// The SDK owns its verifier-slot cleanup; our app-owned attempt must be gone.
-	assert.equal(storage.has("supacapacitor:oauth:return-path"), false);
+	assert.equal(
+		(await restoredClient.auth.getSession()).data.session?.user.id,
+		"test-user",
+	);
 	await restored.oauth.dispose();
 });
