@@ -9,7 +9,6 @@ import {
 	writeFile,
 	rm,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -19,7 +18,8 @@ const exec = promisify(execFile);
 const root = fileURLToPath(new URL("..", import.meta.url));
 
 test("client-only pages and unenumerated routes build a SPA entry point", async (t) => {
-	const dir = await mkdtemp(join(tmpdir(), "supacapacitor-routing-"));
+
+	const dir = await mkdtemp(join(root, ".supacapacitor-routing-"));
 	t.after(() => rm(dir, { recursive: true, force: true }));
 	for (const path of [
 		"src",
