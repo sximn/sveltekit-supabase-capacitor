@@ -1,6 +1,6 @@
 # Contributing to the Template
 
-Use Node 24 (`nvm use`).
+Use Node 26 (`nvm use`).
 For simplicity, npm is used in this template.
 
 Install dependencies with `npm ci`.

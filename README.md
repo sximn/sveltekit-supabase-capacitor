@@ -12,7 +12,7 @@ Email and password signups, confirmation emails, magic links, and password recov
 
 ## Prerequisites
 
-- Node.js **24.x** and npm
+- Node.js **26.x** and npm
     - `.nvmrc` is provided - with nvm run `nvm install` + `nvm use`
 - Supabase project
 - For iOS:
